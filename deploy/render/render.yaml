@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────
+# Render Blueprint — deploys web service + Postgres + Redis
+# Docs: https://render.com/docs/blueprint-spec
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Web Service ───────────────────────────────────────────────
+  - type: web
+    name: dna-report-generator
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter          # upgrade to "standard" for production load
+    healthCheckPath: /api/health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true    # Render auto-generates a secure random value
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dna-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: dna-redis
+          type: redis
+          property: connectionString
+      - key: REPORT_TTL_DAYS
+        value: "7"
+      - key: PORT
+        value: "5000"
+
+  # ── Redis ─────────────────────────────────────────────────────
+  - type: redis
+    name: dna-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+databases:
+
+  # ── PostgreSQL ────────────────────────────────────────────────
+  - name: dna-postgres
+    plan: starter           # free tier; upgrade for production
+    databaseName: dna_reports
+    user: dna_user
+    postgresMajorVersion: 16
