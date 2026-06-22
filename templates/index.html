@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DNA Report Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #1A73E8; --primary-dark: #1557B0;
+      --bg: #F4F7FE; --surface: #FFFFFF;
+      --border: #E2EAF8; --text: #1A1A2E; --muted: #6B7280;
+      --accent: #5BB5A2; --pathogenic: #DC3545;
+      --radius: 10px;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Nav */
+    nav { background: var(--primary); color: white; padding: 0 40px; height: 58px;
+          display: flex; align-items: center; justify-content: space-between; }
+    .nav-brand { font-size: 19px; font-weight: 800; letter-spacing: -0.4px; }
+    .nav-badge { background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 20px; font-size: 11px; }
+
+    /* Hero */
+    .hero { background: linear-gradient(135deg, var(--primary) 0%, #2D8EFF 50%, var(--accent) 100%);
+             color: white; text-align: center; padding: 80px 24px 64px; }
+    .hero-badge { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 20px;
+                  padding: 5px 16px; font-size: 12px; font-weight: 600; margin-bottom: 20px; }
+    .hero h1 { font-size: 44px; font-weight: 900; letter-spacing: -1px; margin-bottom: 16px; line-height: 1.1; }
+    .hero p  { font-size: 18px; opacity: 0.88; max-width: 580px; margin: 0 auto 32px; line-height: 1.6; }
+
+    /* Features strip */
+    .features-strip { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; padding: 0 24px; }
+    .feature-pill { background: rgba(255,255,255,0.15); border-radius: 20px; padding: 6px 14px;
+                    font-size: 13px; display: flex; align-items: center; gap: 6px; }
+
+    /* Main layout */
+    main { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+    /* Upload card */
+    .upload-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+                   padding: 40px; box-shadow: 0 2px 20px rgba(26,115,232,0.08); }
+    .upload-card h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+    .upload-card .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+    /* Drop zone */
+    #dropzone {
+      border: 2.5px dashed var(--border); border-radius: var(--radius);
+      padding: 56px 24px; text-align: center; cursor: pointer;
+      transition: all 0.25s; background: #FAFBFF; position: relative;
+    }
+    #dropzone.dragover { border-color: var(--primary); background: #EBF3FF; transform: scale(1.01); }
+    #dropzone:hover    { border-color: var(--primary); background: #F0F7FF; }
+    .dz-icon { font-size: 52px; margin-bottom: 12px; }
+    .dz-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .dz-sub   { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .dz-formats { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+    .dz-tag { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+              padding: 3px 10px; font-size: 11px; font-weight: 600; color: var(--primary); }
+    #fileInput { display: none; }
+    .btn-upload {
+      display: inline-block; background: var(--primary); color: white;
+      padding: 10px 24px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-upload:hover { background: var(--primary-dark); }
+
+    /* File selected state */
+    #fileInfo { display:none; margin-top: 20px; background: #EBF3FF; border-radius: 8px; padding: 14px 18px; }
+    #fileInfo .fi-name { font-weight: 700; font-size: 14px; color: var(--primary); }
+    #fileInfo .fi-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* Options */
+    .options-row { display: flex; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+    .option-group { flex: 1; min-width: 180px; }
+    .option-group label { display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+                           text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+    .option-group input, .option-group select {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 14px; background: var(--surface); color: var(--text);
+      transition: border-color 0.15s;
+    }
+    .option-group input:focus, .option-group select:focus { outline: none; border-color: var(--primary); }
+
+    /* Submit */
+    .submit-row { margin-top: 28px; display: flex; gap: 12px; align-items: center; }
+    .btn-analyze {
+      background: var(--primary); color: white; border: none; border-radius: 10px;
+      padding: 14px 32px; font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all 0.15s; box-shadow: 0 2px 10px rgba(26,115,232,0.25);
+    }
+    .btn-analyze:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-analyze:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-sample { background: var(--surface); color: var(--primary); border: 1.5px solid var(--border);
+                  border-radius: 10px; padding: 14px 24px; font-size: 13px; font-weight: 600;
+                  cursor: pointer; transition: all 0.15s; }
+    .btn-sample:hover { border-color: var(--primary); background: #F0F7FF; }
+
+    /* Progress */
+    #progressWrap { display:none; margin-top: 28px; }
+    .progress-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill  { height: 100%; background: var(--primary); border-radius: 3px;
+                      width: 0%; transition: width 0.4s ease; }
+    .progress-label { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+    /* How it works */
+    .how-section { margin-top: 56px; }
+    .how-section h2 { font-size: 22px; font-weight: 800; margin-bottom: 24px; text-align: center; }
+    .steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
+    .step-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+                 padding: 24px 20px; text-align: center; }
+    .step-num { width: 36px; height: 36px; background: var(--primary); color: white;
+                border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                font-weight: 800; font-size: 16px; margin: 0 auto 12px; }
+    .step-icon { font-size: 28px; margin-bottom: 10px; }
+    .step-title { font-weight: 700; margin-bottom: 5px; font-size: 14px; }
+    .step-desc  { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+    /* Format guide */
+    .format-section { margin-top: 40px; }
+    .format-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+    .format-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+    .format-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+    .format-card .fc-name { font-weight: 700; font-size: 14px; margin-bottom: 5px; }
+    .format-card .fc-ext  { background: var(--bg); border-radius: 4px; padding: 2px 8px;
+                            font-size: 11px; font-family: monospace; color: var(--primary); display: inline-block; margin-bottom: 8px; }
+    .format-card .fc-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* Disclaimer */
+    .disclaimer { background: #FFF8E6; border: 1px solid #FDE68A; border-radius: var(--radius);
+                  padding: 16px 20px; margin-top: 40px; font-size: 12.5px; color: #92400E; line-height: 1.6; }
+
+    /* Alert */
+    #alertBox { display: none; background: #FEE2E2; border: 1px solid #FCA5A5; color: #B91C1C;
+                border-radius: 8px; padding: 12px 16px; margin-top: 16px; font-size: 13px; }
+
+    footer { text-align: center; padding: 32px; color: var(--muted); font-size: 12px;
+             border-top: 1px solid var(--border); margin-top: 48px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">🧬 DNA Report Generator</span>
+  <span class="nav-badge">Research Preview</span>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">Powered by ClinVar · Ensembl VEP · MyVariant.info · gnomAD</div>
+  <h1>Your DNA,<br>Decoded.</h1>
+  <p>Upload your raw genetic data and receive a comprehensive health &amp; ancestry report in minutes.</p>
+  <div class="features-strip">
+    <span class="feature-pill">🦠 Disease Risk</span>
+    <span class="feature-pill">🌍 Ancestry Composition</span>
+    <span class="feature-pill">💊 Pharmacogenomics</span>
+    <span class="feature-pill">🔬 Physical Traits</span>
+    <span class="feature-pill">🧬 Carrier Status</span>
+    <span class="feature-pill">📄 PDF + HTML Export</span>
+  </div>
+</div>
+
+<main>
+  <div class="upload-card">
+    <h2>Upload Your Raw DNA File</h2>
+    <p class="sub">Supports 23andMe, AncestryDNA, MyHeritage, and VCF formats. Your file is processed locally and never stored.</p>
+
+    <!-- Drop Zone -->
+    <div id="dropzone" onclick="document.getElementById('fileInput').click()">
+      <div class="dz-icon">📂</div>
+      <div class="dz-title">Drop your DNA file here</div>
+      <div class="dz-sub">or click to browse</div>
+      <div class="dz-formats">
+        <span class="dz-tag">.txt (23andMe)</span>
+        <span class="dz-tag">.txt (AncestryDNA)</span>
+        <span class="dz-tag">.csv (MyHeritage)</span>
+        <span class="dz-tag">.vcf</span>
+      </div>
+      <br>
+      <button class="btn-upload" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
+        Choose File
+      </button>
+    </div>
+    <input type="file" id="fileInput" accept=".txt,.csv,.vcf" />
+
+    <!-- File Info (shown after selection) -->
+    <div id="fileInfo">
+      <div class="fi-name" id="fileName">—</div>
+      <div class="fi-meta" id="fileMeta">—</div>
+    </div>
+
+    <div id="alertBox"></div>
+
+    <!-- Options -->
+    <div class="options-row">
+      <div class="option-group">
+        <label>Your Name (optional)</label>
+        <input type="text" id="userName" placeholder="e.g. Jane Smith" />
+      </div>
+      <div class="option-group">
+        <label>Analysis Mode</label>
+        <select id="analysisMode">
+          <option value="fast">⚡ Fast (ClinVar + MyVariant)</option>
+          <option value="full">🔬 Full (All 4 APIs — slower)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Max Variants to Annotate</label>
+        <select id="maxVariants">
+          <option value="200">200 (faster)</option>
+          <option value="500" selected>500 (recommended)</option>
+          <option value="1000">1000 (slow)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="submit-row">
+      <button class="btn-analyze" id="analyzeBtn" onclick="startAnalysis()" disabled>
+        🔬 Analyze DNA
+      </button>
+      <button class="btn-sample" onclick="loadSample()">
+        🧪 Try with Sample Data
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">Uploading file...</div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-section">
+    <h2>How It Works</h2>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-icon">📤</div>
+        <div class="step-num">1</div>
+        <div class="step-title">Upload</div>
+        <div class="step-desc">Upload your raw DNA file from 23andMe, AncestryDNA, MyHeritage, or VCF format.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">⚙️</div>
+        <div class="step-num">2</div>
+        <div class="step-title">Parse &amp; Normalize</div>
+        <div class="step-desc">We parse and normalize variants across formats, extracting rsIDs and genotypes.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">🔗</div>
+        <div class="step-num">3</div>
+        <div class="step-title">Annotate</div>
+        <div class="step-desc">Variants are annotated via ClinVar, Ensembl VEP, MyVariant.info, and gnomAD.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">🧠</div>
+        <div class="step-num">4</div>
+        <div class="step-title">Analyze</div>
+        <div class="step-desc">Our engine categorizes variants and computes polygenic risk scores.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">📊</div>
+        <div class="step-num">5</div>
+        <div class="step-title">Report</div>
+        <div class="step-desc">Download your report as an interactive web dashboard, PDF, or JSON.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Format Guide -->
+  <div class="format-section">
+    <h2>Supported File Formats</h2>
+    <div class="format-cards">
+      <div class="format-card">
+        <div class="fc-name">23andMe</div>
+        <div class="fc-ext">.txt</div>
+        <div class="fc-desc">Tab-separated file with rsid, chromosome, position, genotype columns. Download from Browse Raw Data.</div>
+      </div>
+      <div class="format-card">
+        <div class="fc-name">AncestryDNA</div>
+        <div class="fc-ext">.txt</div>
+        <div class="fc-desc">Tab-separated with rsid, chromosome, position, allele1, allele2. Download from Settings → Download DNA Data.</div>
+      </div>
+      <div class="format-card">
+        <div class="fc-name">MyHeritage</div>
+        <div class="fc-ext">.csv</div>
+        <div class="fc-desc">Comma-separated with RSID, CHROMOSOME, POSITION, RESULT columns.</div>
+      </div>
+      <div class="format-card">
+        <div class="fc-name">VCF</div>
+        <div class="fc-ext">.vcf</div>
+        <div class="fc-desc">Standard Variant Call Format. Supports both GRCh37 and GRCh38 reference assemblies.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <strong>⚠️ Important Disclaimer:</strong> This tool is for informational and educational purposes only.
+    It does not constitute medical advice, diagnosis, or treatment. Polygenic risk scores are statistical estimates
+    based on population studies and do not predict individual outcomes. Raw DNA data is processed server-side only
+    during your session and is not stored. Always consult a qualified healthcare provider or certified genetic
+    counselor before making any health decisions based on genetic information.
+  </div>
+</main>
+
+<footer>
+  <p>DNA Report Generator · Open Source · Data sources: NCBI ClinVar, Ensembl, MyVariant.info, gnomAD</p>
+</footer>
+
+<script>
+  const fileInput = document.getElementById("fileInput");
+  const dropzone  = document.getElementById("dropzone");
+  const analyzeBtn= document.getElementById("analyzeBtn");
+  const fileInfo  = document.getElementById("fileInfo");
+  const alertBox  = document.getElementById("alertBox");
+
+  let selectedFile = null;
+
+  // ── Drag and drop ────────────────────────────────────────────────────────
+  dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", e => {
+    e.preventDefault(); dropzone.classList.remove("dragover");
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    const allowed = [".txt", ".csv", ".vcf"];
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    if (!allowed.includes(ext)) {
+      showAlert("Unsupported file type. Please upload a .txt, .csv, or .vcf file.");
+      return;
+    }
+    selectedFile = file;
+    document.getElementById("fileName").textContent = "📄 " + file.name;
+    document.getElementById("fileMeta").textContent = `${(file.size / 1024).toFixed(1)} KB · ${ext.toUpperCase()}`;
+    fileInfo.style.display = "block";
+    analyzeBtn.disabled = false;
+    hideAlert();
+    dropzone.style.borderColor = "var(--accent)";
+    dropzone.style.background  = "#F0FDF9";
+  }
+
+  function showAlert(msg) { alertBox.textContent = msg; alertBox.style.display = "block"; }
+  function hideAlert()    { alertBox.style.display = "none"; }
+
+  // ── Start Analysis ───────────────────────────────────────────────────────
+  async function startAnalysis() {
+    if (!selectedFile) { showAlert("Please select a file first."); return; }
+
+    const name    = document.getElementById("userName").value || "User";
+    const mode    = document.getElementById("analysisMode").value;
+    const maxVar  = document.getElementById("maxVariants").value;
+
+    analyzeBtn.disabled = true;
+    analyzeBtn.textContent = "⏳ Analyzing...";
+    showProgress("Uploading file...", 10);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("name", name);
+    formData.append("mode", mode);
+    formData.append("max_variants", maxVar);
+
+    try {
+      showProgress("Parsing variants...", 25);
+      const res = await fetch("/api/analyze", { method: "POST", body: formData });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Analysis failed");
+      }
+
+      showProgress("Annotating with genomic databases...", 60);
+      const data = await res.json();
+      showProgress("Generating report...", 90);
+
+      // Redirect to report page
+      const reportId = data.report_id;
+      showProgress("Complete! Redirecting...", 100);
+      setTimeout(() => { window.location.href = `/report/${reportId}`; }, 600);
+
+    } catch (err) {
+      showAlert("Error: " + err.message);
+      analyzeBtn.disabled = false;
+      analyzeBtn.textContent = "🔬 Analyze DNA";
+      hideProgress();
+    }
+  }
+
+  // ── Sample Data ──────────────────────────────────────────────────────────
+  async function loadSample() {
+    const name = document.getElementById("userName").value || "Demo User";
+    const mode = document.getElementById("analysisMode").value;
+    showProgress("Loading sample data...", 30);
+    try {
+      const res = await fetch(`/api/sample?name=${encodeURIComponent(name)}&mode=${mode}`);
+      if (!res.ok) throw new Error("Sample analysis failed");
+      const data = await res.json();
+      showProgress("Complete! Redirecting...", 100);
+      setTimeout(() => { window.location.href = `/report/${data.report_id}`; }, 500);
+    } catch (err) {
+      showAlert("Sample error: " + err.message);
+      hideProgress();
+    }
+  }
+
+  function showProgress(label, pct) {
+    document.getElementById("progressWrap").style.display = "block";
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressLabel").textContent = label;
+  }
+  function hideProgress() { document.getElementById("progressWrap").style.display = "none"; }
+</script>
+</body>
+</html>

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DNA Report — {{ report.name | default('Your') }}</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary:    #1A73E8;
+      --primary-dark: #1557B0;
+      --secondary:  #4A90D9;
+      --accent:     #5BB5A2;
+      --bg:         #F4F7FE;
+      --surface:    #FFFFFF;
+      --border:     #E2EAF8;
+      --text:       #1A1A2E;
+      --muted:      #6B7280;
+      --pathogenic: #DC3545;
+      --warning:    #F59E0B;
+      --safe:       #10B981;
+      --radius:     8px;
+      --shadow:     0 1px 4px rgba(26,115,232,0.08), 0 2px 12px rgba(26,115,232,0.05);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+           background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+
+    /* ─── Top Nav ───────────────────────────────────────────────────────────── */
+    .top-nav {
+      background: var(--primary);
+      color: #fff;
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .nav-brand { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .nav-actions { display: flex; gap: 10px; }
+    .btn {
+      padding: 7px 16px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-outline { background: transparent; border: 1.5px solid rgba(255,255,255,0.5); color: #fff; }
+    .btn-outline:hover { background: rgba(255,255,255,0.15); }
+    .btn-white  { background: #fff; color: var(--primary); }
+    .btn-white:hover { background: #f0f4fe; }
+
+    /* ─── Hero ──────────────────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      padding: 48px 32px 40px;
+    }
+    .hero-inner { max-width: 900px; margin: 0 auto; }
+    .hero h1  { font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+    .hero p   { opacity: 0.85; font-size: 15px; margin-bottom: 24px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-card {
+      background: rgba(255,255,255,0.15);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .stat-card .val { font-size: 28px; font-weight: 800; }
+    .stat-card .lbl { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+    /* ─── Disclaimer Banner ─────────────────────────────────────────────────── */
+    .disclaimer {
+      background: #FFF8E6;
+      border-left: 4px solid var(--warning);
+      padding: 12px 20px;
+      font-size: 12px;
+      color: #92400E;
+      max-width: 900px;
+      margin: 20px auto 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    /* ─── Tabs ──────────────────────────────────────────────────────────────── */
+    .tabs-wrapper { max-width: 900px; margin: 28px auto 0; padding: 0 16px; }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--border);
+      overflow-x: auto;
+      padding-bottom: 0;
+    }
+    .tab {
+      padding: 10px 18px;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .tab:hover  { color: var(--primary); background: rgba(26,115,232,0.04); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(26,115,232,0.06); }
+    .tab-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--primary); color: white;
+      font-size: 10px; font-weight: 700;
+      border-radius: 10px; padding: 1px 6px;
+      margin-left: 6px;
+    }
+    .tab-badge.red  { background: var(--pathogenic); }
+    .tab-badge.warn { background: var(--warning); color: #92400e; }
+    .tab-badge.safe { background: var(--safe); }
+
+    /* ─── Panels ────────────────────────────────────────────────────────────── */
+    .panel { display: none; padding: 28px 0; }
+    .panel.active { display: block; }
+
+    /* ─── Cards ─────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    .card h2 { font-size: 17px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+    .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+
+    /* ─── Tables ────────────────────────────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .data-table th {
+      background: var(--primary);
+      color: white;
+      padding: 9px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .data-table th:first-child { border-radius: var(--radius) 0 0 0; }
+    .data-table th:last-child  { border-radius: 0 var(--radius) 0 0; }
+    .data-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(26,115,232,0.03); }
+    .data-table tr:nth-child(even) td { background: #FAFBFF; }
+    .data-table tr:nth-child(even):hover td { background: rgba(26,115,232,0.03); }
+
+    /* ─── Badges ────────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-red     { background: #FEE2E2; color: #DC2626; }
+    .badge-yellow  { background: #FEF3C7; color: #D97706; }
+    .badge-green   { background: #D1FAE5; color: #059669; }
+    .badge-blue    { background: #DBEAFE; color: #1D4ED8; }
+    .badge-gray    { background: #F3F4F6; color: #4B5563; }
+
+    /* ─── Progress Bars ─────────────────────────────────────────────────────── */
+    .risk-bar-wrap { margin-bottom: 16px; }
+    .risk-bar-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .risk-bar-label { font-weight: 600; font-size: 13px; }
+    .risk-bar-value { font-size: 12px; color: var(--muted); }
+    .risk-bar-track {
+      height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+    }
+    .risk-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+    .risk-bar-fill.high     { background: linear-gradient(90deg, var(--pathogenic), #FF6B6B); }
+    .risk-bar-fill.elevated { background: linear-gradient(90deg, var(--warning), #FCD34D); }
+    .risk-bar-fill.average  { background: linear-gradient(90deg, var(--accent), #7DDDD1); }
+    .risk-bar-fill.below_average { background: linear-gradient(90deg, var(--safe), #6EE7B7); }
+
+    /* ─── Ancestry Chart ────────────────────────────────────────────────────── */
+    .ancestry-chart { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+    .donut-container { position: relative; width: 180px; height: 180px; flex-shrink: 0; }
+    .donut-label {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .donut-label .big { font-size: 22px; font-weight: 800; color: var(--text); }
+    .donut-label .sm  { font-size: 11px; color: var(--muted); }
+    .ancestry-legend { flex: 1; min-width: 200px; }
+    .ancestry-legend-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .ancestry-legend-item:last-child { border-bottom: none; }
+    .ancestry-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+    .ancestry-name { display: flex; align-items: center; font-size: 13px; font-weight: 500; }
+    .ancestry-pct  { font-size: 13px; font-weight: 700; color: var(--primary); }
+    .ancestry-bar-mini {
+      height: 4px; border-radius: 2px; margin-top: 3px;
+      transition: width 0.8s ease;
+    }
+
+    /* ─── Trait Cards ───────────────────────────────────────────────────────── */
+    .traits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .trait-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .trait-icon  { font-size: 24px; margin-bottom: 8px; }
+    .trait-name  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+    .trait-gene  { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .trait-geno  { font-family: "Courier New", monospace; font-size: 13px; font-weight: 700;
+                   color: var(--primary); background: #EBF3FF; padding: 2px 8px; border-radius: 4px; }
+    .trait-result { font-size: 12.5px; margin-top: 8px; color: var(--text); }
+
+    /* ─── PGx ───────────────────────────────────────────────────────────────── */
+    .pgx-card {
+      border-left: 4px solid var(--warning);
+      padding: 14px 16px;
+      background: #FFFBF0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: 12px;
+    }
+    .pgx-card.high { border-left-color: var(--pathogenic); background: #FFF5F5; }
+    .pgx-card.low  { border-left-color: var(--safe); background: #F0FDF9; }
+    .pgx-gene { font-weight: 700; font-size: 14px; }
+    .pgx-drugs { font-size: 12px; color: var(--muted); margin: 4px 0; }
+    .pgx-effect { font-size: 13px; }
+
+    /* ─── Footer ────────────────────────────────────────────────────────────── */
+    footer {
+      text-align: center; padding: 32px 16px; color: var(--muted);
+      font-size: 12px; border-top: 1px solid var(--border); margin-top: 40px;
+    }
+
+    /* ─── Print ─────────────────────────────────────────────────────────────── */
+    @media print {
+      .top-nav, .nav-actions, .tabs { display: none !important; }
+      .panel { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top Nav ──────────────────────────────────────────────────────────── -->
+<nav class="top-nav">
+  <span class="nav-brand">🧬 DNA Report Generator</span>
+  <div class="nav-actions">
+    <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+    <button class="btn btn-outline" onclick="downloadJSON()">⬇️ JSON</button>
+    <button class="btn btn-white"   onclick="downloadHTML()">💾 Save HTML</button>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="hero-inner">
+    <h1>{{ report.name | default("Your") }} DNA Health &amp; Ancestry Report</h1>
+    <p>Generated on {{ report.generated_at | default("today") }} · File format: <strong>{{ report.summary.format | upper }}</strong> · Analysis mode: <strong>{{ report.summary.mode | default("Fast") | title }}</strong></p>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="val">{{ report.summary.total_variants | default(0) | int | format_number }}</div>
+        <div class="lbl">Variants Analyzed</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" style="color:#FFD6D6;">{{ report.summary.pathogenic_count | default(0) }}</div>
+        <div class="lbl">Pathogenic Flags</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">{{ report.ancestry.top_population | default("Unknown") }}</div>
+        <div class="lbl">Top Ancestry</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">{{ report.pharmacogenomics | length }}</div>
+        <div class="lbl">PGx Findings</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs-wrapper">
+  <div class="disclaimer">
+    ⚠️ <strong>Not a medical diagnosis.</strong> This report is for informational purposes only. Consult a licensed healthcare provider or genetic counselor before making health decisions.
+  </div>
+
+  <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
+  <div class="tabs" style="margin-top:24px;">
+    <button class="tab active" data-panel="ancestry">🌍 Ancestry</button>
+    <button class="tab" data-panel="risk">
+      📊 Disease Risk
+      {% if report.risk_scores %}<span class="tab-badge">{{ report.risk_scores | length }}</span>{% endif %}
+    </button>
+    <button class="tab" data-panel="pathogenic">
+      ⚠️ Pathogenic
+      {% if report.categories.pathogenic %}
+        <span class="tab-badge red">{{ report.categories.pathogenic | length }}</span>
+      {% endif %}
+    </button>
+    <button class="tab" data-panel="pgx">💊 Pharmacogenomics</button>
+    <button class="tab" data-panel="traits">🔬 Traits</button>
+    <button class="tab" data-panel="inherited">🧬 Inherited</button>
+    <button class="tab" data-panel="raw">📋 All Variants</button>
+  </div>
+
+  <!-- ── ANCESTRY PANEL ─────────────────────────────────────────────── -->
+  <div id="panel-ancestry" class="panel active">
+    <div class="card">
+      <h2>Ancestry Composition</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
+        Estimated from <strong>{{ report.ancestry.markers_used | default(0) }}</strong> ancestry-informative markers.
+        Confidence: <strong>{{ (report.ancestry.confidence | default(0) * 100) | round(1) }}%</strong>
+      </p>
+      <div class="ancestry-chart">
+        <div class="donut-container">
+          <canvas id="ancestryDonut" width="180" height="180"></canvas>
+          <div class="donut-label">
+            <div class="big">{{ report.ancestry.top_population | default("—") | truncate(10, true, "") }}</div>
+            <div class="sm">Dominant</div>
+          </div>
+        </div>
+        <div class="ancestry-legend">
+          {% set colors_map = {"AFR": "#4A90D9", "EUR": "#7EB8F7", "EAS": "#5BB5A2", "SAS": "#A8D8A8", "AMR": "#B8A8D8"} %}
+          {% for pop, pct in report.ancestry.composition.items() | sort(attribute='1', reverse=true) %}
+          <div class="ancestry-legend-item">
+            <div class="ancestry-name">
+              <div class="ancestry-dot" style="background: {{ colors_map.get(pop, '#999') }}"></div>
+              {{ report.ancestry.labels.get(pop, pop) }}
+            </div>
+            <div>
+              <div class="ancestry-pct">{{ pct }}%</div>
+              <div class="ancestry-bar-mini" style="width: {{ pct * 2 | int }}px; background: {{ colors_map.get(pop, '#999') }}; min-width: 4px;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DISEASE RISK PANEL ─────────────────────────────────────────── -->
+  <div id="panel-risk" class="panel">
+    <div class="card">
+      <h2>Complex Disease Risk Scores</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
+        Polygenic risk scores based on published GWAS studies. These are relative estimates, not absolute predictions.
+      </p>
+      {% for rs in report.risk_scores %}
+      <div class="risk-bar-wrap">
+        <div class="risk-bar-header">
+          <span class="risk-bar-label">{{ rs.condition }}</span>
+          <span class="risk-bar-value">
+            <span class="badge badge-{% if rs.risk_tier == 'high' %}red{% elif rs.risk_tier == 'elevated' %}yellow{% elif rs.risk_tier == 'average' %}blue{% else %}green{% endif %}">
+              {{ rs.risk_label }}
+            </span>
+            &nbsp;{{ rs.adjusted_risk_pct }}% lifetime est. &nbsp;·&nbsp; {{ rs.relative_risk }}× relative
+          </span>
+        </div>
+        <div class="risk-bar-track">
+          <div class="risk-bar-fill {{ rs.risk_tier }}" style="width: {{ [rs.adjusted_risk_pct * 2, 100] | min }}%"></div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">
+          {{ rs.description }} &nbsp;·&nbsp; {{ rs.snps_analyzed }}/{{ rs.snps_total }} SNPs found in your data
+        </p>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);">No relevant disease-risk variants identified in the analyzed SNP set.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── PATHOGENIC PANEL ───────────────────────────────────────────── -->
+  <div id="panel-pathogenic" class="panel">
+    <div class="card">
+      <h2>Pathogenic &amp; Likely Pathogenic Variants</h2>
+      {% if report.categories.pathogenic %}
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">
+        {{ report.categories.pathogenic | length }} variant(s) with clinical significance flagged. Please discuss with a genetic counselor.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>rsID</th><th>Gene</th><th>Chr</th><th>Position</th>
+            <th>Genotype</th><th>Significance</th><th>CADD</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in report.categories.pathogenic %}
+          <tr>
+            <td><code>{{ v.rsid }}</code></td>
+            <td><strong>{{ v.gene or '—' }}</strong></td>
+            <td>{{ v.chromosome }}</td>
+            <td>{{ v.position }}</td>
+            <td><span class="badge badge-blue">{{ v.genotype }}</span></td>
+            <td>
+              <span class="badge badge-{% if 'Pathogenic' in (v.clinical_significance or '') %}red{% else %}yellow{% endif %}">
+                {{ v.clinical_significance or '—' }}
+              </span>
+            </td>
+            <td>{{ v.cadd_score | round(1) if v.cadd_score else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="text-align:center;padding:40px;color:var(--muted);">
+        <div style="font-size:48px;margin-bottom:12px;">✅</div>
+        <strong>No pathogenic variants identified</strong>
+        <p style="font-size:12px;margin-top:6px;">Among the variants analyzed, none were flagged as pathogenic or likely pathogenic.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── PHARMACOGENOMICS PANEL ─────────────────────────────────────── -->
+  <div id="panel-pgx" class="panel">
+    <div class="card">
+      <h2>Pharmacogenomics (Drug-Gene Interactions)</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
+        These variants may affect how your body processes certain medications. Always inform your prescriber.
+      </p>
+      {% for p in report.pharmacogenomics %}
+      <div class="pgx-card {{ p.severity }}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span class="pgx-gene">{{ p.gene }} <span style="font-weight:400;color:var(--muted);">{{ p.star_allele }}</span></span>
+          <span class="badge badge-{% if p.severity == 'high' %}red{% elif p.severity == 'moderate' %}yellow{% else %}green{% endif %}">
+            {{ p.severity | title }} Impact
+          </span>
+        </div>
+        <div class="pgx-drugs">💊 Affected drugs: {{ p.drugs_affected | join(", ") }}</div>
+        <div class="pgx-effect">{{ p.effect }}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--muted);">
+          Your genotype: <code>{{ p.your_genotype }}</code> &nbsp;·&nbsp; rsID: <code>{{ p.rsid }}</code>
+        </div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);">No pharmacogenomic variants found in the analyzed set.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── TRAITS PANEL ───────────────────────────────────────────────── -->
+  <div id="panel-traits" class="panel">
+    <div class="card">
+      <h2>Physical &amp; Sensory Traits</h2>
+      <div class="traits-grid">
+        {% for t in report.traits %}
+        <div class="trait-card">
+          <div class="trait-icon">{{ t.icon }}</div>
+          <div class="trait-name">{{ t.trait }}</div>
+          <div class="trait-gene">{{ t.gene }}</div>
+          <div class="trait-geno">{{ t.your_genotype }}</div>
+          <div class="trait-result">{{ t.interpretation }}</div>
+        </div>
+        {% else %}
+        <p style="color:var(--muted);">No trait variants found in the analyzed set.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INHERITED CONDITIONS PANEL ────────────────────────────────── -->
+  <div id="panel-inherited" class="panel">
+    <div class="card">
+      <h2>Inherited Conditions &amp; Carrier Status</h2>
+      {% set inherited = report.categories.inherited | default([]) %}
+      {% if inherited %}
+      <table class="data-table">
+        <thead>
+          <tr><th>rsID</th><th>Gene</th><th>Condition</th><th>Genotype</th><th>Inheritance</th></tr>
+        </thead>
+        <tbody>
+          {% for v in inherited %}
+          <tr>
+            <td><code>{{ v.rsid }}</code></td>
+            <td><strong>{{ v.gene or '—' }}</strong></td>
+            <td>{{ v.condition or '—' }}</td>
+            <td><span class="badge badge-blue">{{ v.genotype }}</span></td>
+            <td>{{ v.inheritance or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--muted);">No inherited condition variants found in the analyzed set.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── RAW VARIANTS PANEL ─────────────────────────────────────────── -->
+  <div id="panel-raw" class="panel">
+    <div class="card">
+      <h2>All Annotated Variants</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">
+        Showing top 200 variants sorted by CADD score. Use the JSON export for the full dataset.
+      </p>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="allVariantsTable">
+          <thead>
+            <tr>
+              <th>rsID</th><th>Chr</th><th>Position</th><th>Genotype</th>
+              <th>Gene</th><th>Consequence</th><th>ClinSig</th><th>CADD</th><th>gnomAD AF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set all_variants = [] %}
+            {% for cat, variants in report.categories.items() %}
+              {% for v in variants %}
+                {% if all_variants.append(v) %}{% endif %}
+              {% endfor %}
+            {% endfor %}
+            {% for v in all_variants | sort(attribute='cadd_score', reverse=true) | list %}
+            <tr>
+              <td><code>{{ v.rsid }}</code></td>
+              <td>{{ v.chromosome }}</td>
+              <td>{{ v.position }}</td>
+              <td><span class="badge badge-blue">{{ v.genotype }}</span></td>
+              <td>{{ v.gene or '—' }}</td>
+              <td>{{ v.consequence or '—' }}</td>
+              <td>
+                {% if v.clinical_significance %}
+                <span class="badge badge-{% if 'Pathogenic' in v.clinical_significance %}red{% elif 'Benign' in v.clinical_significance %}green{% else %}gray{% endif %}">
+                  {{ v.clinical_significance | truncate(20) }}
+                </span>
+                {% else %}—{% endif %}
+              </td>
+              <td>{{ v.cadd_score | round(1) if v.cadd_score else '—' }}</td>
+              <td>{{ "%.4f" | format(v.gnomad_af) if v.gnomad_af else '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tabs-wrapper -->
+
+<footer>
+  <p>Generated by <strong>DNA Report Generator</strong> · Data sources: ClinVar, Ensembl VEP, MyVariant.info, gnomAD</p>
+  <p style="margin-top:4px;">This report is for informational purposes only and does not constitute medical advice.</p>
+</footer>
+
+<script>
+  // Embed report JSON for export
+  const REPORT_DATA = {{ report_json | safe }};
+
+  // ── Tab switching ────────────────────────────────────────────────────────
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      const panelId = "panel-" + tab.dataset.panel;
+      const panel = document.getElementById(panelId);
+      if (panel) panel.classList.add("active");
+    });
+  });
+
+  // ── Ancestry Donut Chart (vanilla Canvas) ───────────────────────────────
+  function drawDonut() {
+    const canvas = document.getElementById("ancestryDonut");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const comp = REPORT_DATA.ancestry?.composition || {};
+    const colorMap = { AFR: "#4A90D9", EUR: "#7EB8F7", EAS: "#5BB5A2", SAS: "#A8D8A8", AMR: "#B8A8D8" };
+
+    const cx = 90, cy = 90, r = 70, inner = 45;
+    let startAngle = -Math.PI / 2;
+    const total = Object.values(comp).reduce((a, b) => a + b, 0) || 1;
+
+    for (const [pop, pct] of Object.entries(comp)) {
+      const slice = (pct / total) * 2 * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, startAngle, startAngle + slice);
+      ctx.closePath();
+      ctx.fillStyle = colorMap[pop] || "#ccc";
+      ctx.fill();
+      startAngle += slice;
+    }
+    // Inner hole
+    ctx.beginPath();
+    ctx.arc(cx, cy, inner, 0, 2 * Math.PI);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  }
+  drawDonut();
+
+  // ── JSON Download ─────────────────────────────────────────────────────
+  function downloadJSON() {
+    const blob = new Blob([JSON.stringify(REPORT_DATA, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dna_report.json";
+    a.click();
+  }
+
+  // ── HTML Download ─────────────────────────────────────────────────────
+  function downloadHTML() {
+    const blob = new Blob([document.documentElement.outerHTML], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dna_report.html";
+    a.click();
+  }
+</script>
+</body>
+</html>
