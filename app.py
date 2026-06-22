@@ -40,9 +40,9 @@ REPORTS_FOLDER     = Path(tempfile.gettempdir()) / "dna_reports"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 REPORTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
-# In-memory report store (keyed by report_id)
-# In production, swap for Redis or a database
-REPORT_STORE: dict = {}
+# Persistent report store (Redis + PostgreSQL + in-memory fallback)
+from store import get_store
+REPORT_STORE = get_store()
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -312,7 +312,7 @@ def download_json(report_id: str):
 
 @app.route("/api/health")
 def health():
-    return jsonify({"status": "ok", "reports_in_memory": len(REPORT_STORE)})
+    return jsonify({"status": "ok", "reports_stored": REPORT_STORE.count()})
 
 
 # ── 404 / 500 handlers ───────────────────────────────────────────────────────
