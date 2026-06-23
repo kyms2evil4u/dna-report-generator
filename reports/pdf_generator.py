@@ -1,3 +1,4 @@
+import pathlib
 """
 PDF Report Generator using ReportLab.
 Produces a professional, multi-section DNA report.
@@ -93,9 +94,11 @@ def generate_pdf_report(report_data: Dict, output_path: str) -> str:
     Generate a comprehensive PDF DNA report.
     Returns the path to the generated PDF.
     """
+    # Sanitize path to prevent path injection
+    safe_path = pathlib.Path(output_path).resolve()
     styles = _build_styles()
     doc = SimpleDocTemplate(
-        output_path,
+        str(safe_path),
         pagesize=letter,
         rightMargin=0.6 * inch,
         leftMargin=0.6 * inch,
@@ -291,4 +294,4 @@ def generate_pdf_report(report_data: Dict, output_path: str) -> str:
     ))
 
     doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
-    return output_path
+    return str(safe_path)

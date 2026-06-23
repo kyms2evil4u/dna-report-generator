@@ -198,8 +198,12 @@ class TestJsonExportRoute:
         body = json.loads(res.data)
         assert body["report_id"] == rid
 
-    def test_json_export_unknown_id_returns_404(self, client):
+    def test_json_export_invalid_id_returns_400(self, client):
         res = client.get("/report/nonexistent-id/json")
+        assert res.status_code == 400
+
+    def test_json_export_unknown_id_returns_404(self, client):
+        res = client.get("/report/c296c47a-541b-4878-a567-a385a482f6f8/json")
         assert res.status_code == 404
 
 

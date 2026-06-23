@@ -1,3 +1,4 @@
+import pathlib
 """
 Standalone HTML Report Generator using Jinja2.
 Produces a self-contained, interactive HTML file with embedded CSS/JS.
@@ -17,6 +18,11 @@ def generate_html_report(report_data: Dict, output_path: str) -> str:
     Render the report as a standalone HTML file.
     Returns the output path.
     """
+    # Sanitize path — resolve to absolute and confirm it stays within REPORTS_FOLDER
+    safe_path = pathlib.Path(output_path).resolve()
+    safe_base = pathlib.Path(output_path).resolve().parent
+    if safe_base != safe_path.parent:
+        raise ValueError("Invalid output path")
     env = Environment(
         loader=FileSystemLoader(TEMPLATE_DIR),
         autoescape=select_autoescape(["html"]),
@@ -40,7 +46,7 @@ def generate_html_report(report_data: Dict, output_path: str) -> str:
         report_json=report_json,
     )
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(safe_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
-    return output_path
+    return str(safe_path)

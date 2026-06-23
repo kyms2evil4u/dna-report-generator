@@ -71,6 +71,15 @@ REPORTS_FOLDER     = Path(tempfile.gettempdir()) / "dna_reports"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 REPORTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
+def _validate_report_id(report_id: str) -> bool:
+    """Return True only if report_id is a valid UUID (prevents path injection)."""
+    try:
+        uuid.UUID(report_id)
+        return True
+    except ValueError:
+        return False
+
+
 REPORT_STORE = get_store()
 
 
@@ -457,6 +466,8 @@ def view_report(report_id: str):
 
 @app.route("/report/<report_id>/pdf")
 def download_pdf(report_id: str):
+    if not _validate_report_id(report_id):
+        abort(400)
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
@@ -466,13 +477,15 @@ def download_pdf(report_id: str):
         name = report_data.get("name", "report").replace(" ", "_").lower()
         return send_file(str(pdf_path), mimetype="application/pdf",
                          as_attachment=True, download_name=f"dna_report_{name}.pdf")
-    except Exception as e:
+    except Exception:
         logger.exception("PDF generation error")
-        return jsonify({"error": f"PDF generation failed: {e}"}), 500
+        return jsonify({"error": "PDF generation failed. Check server logs."}), 500
 
 
 @app.route("/report/<report_id>/html")
 def download_html(report_id: str):
+    if not _validate_report_id(report_id):
+        abort(400)
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
@@ -482,13 +495,15 @@ def download_html(report_id: str):
         name = report_data.get("name", "report").replace(" ", "_").lower()
         return send_file(str(html_path), mimetype="text/html",
                          as_attachment=True, download_name=f"dna_report_{name}.html")
-    except Exception as e:
+    except Exception:
         logger.exception("HTML export error")
-        return jsonify({"error": f"HTML export failed: {e}"}), 500
+        return jsonify({"error": "HTML export failed. Check server logs."}), 500
 
 
 @app.route("/report/<report_id>/json")
 def download_json(report_id: str):
+    if not _validate_report_id(report_id):
+        abort(400)
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
