@@ -189,14 +189,15 @@
         <span class="dz-tag">.txt (23andMe)</span>
         <span class="dz-tag">.txt (AncestryDNA)</span>
         <span class="dz-tag">.csv (MyHeritage)</span>
-        <span class="dz-tag">.vcf</span>
+        <span class="dz-tag">.vcf / .vcf.gz</span>
       </div>
+      <div class="dz-sub" style="margin-top:8px;font-size:12px;">Up to 2 GB &nbsp;·&nbsp; compressed files supported</div>
       <br>
       <button class="btn-upload" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
         Choose File
       </button>
     </div>
-    <input type="file" id="fileInput" accept=".txt,.csv,.vcf" />
+    <input type="file" id="fileInput" accept=".txt,.csv,.vcf,.vcf.gz,.txt.gz,.gz" />
 
     <!-- File Info (shown after selection) -->
     <div id="fileInfo">
@@ -380,6 +381,12 @@
                  name.endsWith(".txt.gz");
     if (!ok) {
       showAlert("Unsupported file type. Please upload a .txt, .csv, .vcf, or .vcf.gz file.");
+      return;
+    }
+    // Client-side size guard — matches server MAX_CONTENT_LENGTH (2 GB)
+    const MAX_BYTES = 2 * 1024 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      showAlert("File exceeds the 2 GB limit. Please pre-filter your VCF to SNP-only variants before uploading.");
       return;
     }
     selectedFile = file;
