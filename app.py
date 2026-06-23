@@ -6,32 +6,41 @@ Large-file support:
   - Flask MAX_CONTENT_LENGTH: 2 GB
   - Uploads streamed to disk in 1 MB chunks (never fully buffered in RAM)
   - Size limit configurable via MAX_FILE_SIZE_MB env var (default: 700 MB)
-  - Werkzeug streaming save used for all uploads
   - Parsers use line-by-line iteration (constant memory regardless of file size)
+
+Progress tracking:
+  - /api/analyze returns {task_id} immediately; pipeline runs synchronously
+    but emits stage updates into the task store as it progresses.
+  - /api/status/<task_id> — poll endpoint (JSON) for current stage/pct/label
+  - /api/status/<task_id>/stream — Server-Sent Events stream for real-time
+    progress bar without WebSocket overhead
 """
 
 import os
 import uuid
 import json
+import time
 import logging
 import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 
 from flask import (
     Flask, request, jsonify, render_template,
-    send_file, abort, session,
+    send_file, abort, Response, stream_with_context,
 )
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
+import tasks
 from parsers import detect_format, parse_23andme, parse_ancestry, parse_myheritage, parse_vcf, normalize_variants
 from api import annotate_variants
 from analysis import categorize_variants, compute_ancestry, compute_risk_scores, analyze_pharmacogenomics, analyze_traits
 from reports import generate_pdf_report, generate_html_report
 from data.sample_generator import generate_sample_variants
 
-# ── App setup ────────────────────────────────────────────────────────────────
+# ── App setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(32))
 CORS(app)
@@ -39,60 +48,44 @@ CORS(app)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── File size configuration ───────────────────────────────────────────────────
-# Raw DNA files:
-#   23andMe:    ~25–30 MB (uncompressed TSV)
-#   AncestryDNA:~25–35 MB
-#   MyHeritage: ~30–40 MB
-#   Whole-genome VCF: up to 600+ MB
-#
-# MAX_FILE_SIZE_MB: hard reject limit (default 700 MB, override via env var)
-# MAX_CONTENT_LENGTH: Flask/Werkzeug hard cut — set to 2 GB to avoid
-#   premature 413s before our friendlier error message fires.
-#
+# ── File size configuration ────────────────────────────────────────────────────
 MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", 700))
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024   # 2 GB hard ceiling
+STREAM_CHUNK_SIZE = 1 * 1024 * 1024                          # 1 MB streaming chunks
 
-STREAM_CHUNK_SIZE = 1 * 1024 * 1024   # 1 MB chunks for streaming save
-
-ALLOWED_EXTENSIONS = {".txt", ".csv", ".vcf", ".gz"}   # .gz for bgzipped VCFs
+ALLOWED_EXTENSIONS = {".txt", ".csv", ".vcf", ".gz"}
 UPLOAD_FOLDER      = Path(tempfile.gettempdir()) / "dna_uploads"
 REPORTS_FOLDER     = Path(tempfile.gettempdir()) / "dna_reports"
 
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 REPORTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
-# Persistent report store (Redis + PostgreSQL + in-memory fallback)
 from store import get_store
 REPORT_STORE = get_store()
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def allowed_file(filename: str) -> bool:
-    """Accept .txt, .csv, .vcf, and .vcf.gz files."""
     name = filename.lower()
-    # Handle double extensions like .vcf.gz
     if name.endswith(".vcf.gz") or name.endswith(".txt.gz"):
         return True
-    ext = Path(name).suffix
-    return ext in ALLOWED_EXTENSIONS
+    return Path(name).suffix in ALLOWED_EXTENSIONS
 
 
 def stream_save(file_storage, dest_path: Path) -> int:
     """
-    Stream a Werkzeug FileStorage object to disk in fixed-size chunks.
-    Never loads the full file into memory.
-    Returns the total bytes written.
+    Stream a Werkzeug FileStorage to disk in fixed-size chunks.
+    Never loads the full file into memory. Returns total bytes written.
     """
-    total_bytes = 0
+    total = 0
     with open(dest_path, "wb") as out:
         while True:
             chunk = file_storage.stream.read(STREAM_CHUNK_SIZE)
             if not chunk:
                 break
             out.write(chunk)
-            total_bytes += len(chunk)
-    return total_bytes
+            total += len(chunk)
+    return total
 
 
 def parse_file(filepath: str, fmt: str) -> list:
@@ -113,12 +106,18 @@ def run_full_pipeline(
     name: str = "User",
     mode: str = "fast",
     max_variants: int = 500,
+    task_id: str = None,
 ) -> dict:
     """
-    Full analysis pipeline:
-    parse → normalize → annotate → categorize → score → report data
+    Full analysis pipeline with optional task-stage tracking.
+    Each stage calls tasks.advance() so /api/status reflects live progress.
     """
+    def _advance(stage, **kw):
+        if task_id:
+            tasks.advance(task_id, stage, **kw)
+
     # 1. Detect format
+    _advance("detecting")
     fmt = detect_format(filepath)
     logger.info(f"Detected format: {fmt}")
     if fmt == "unknown":
@@ -127,41 +126,35 @@ def run_full_pipeline(
             "Please ensure the file is a valid 23andMe, AncestryDNA, MyHeritage, or VCF export."
         )
 
-    # 2. Parse (all parsers use line-by-line iteration — O(1) memory)
+    # 2. Parse
+    _advance("parsing")
     raw_variants = parse_file(filepath, fmt)
     logger.info(f"Parsed {len(raw_variants):,} raw variants")
 
     # 3. Normalize
+    _advance("normalizing")
     variants = normalize_variants(raw_variants)
     logger.info(f"Normalized to {len(variants):,} clean variants")
-
     if len(variants) == 0:
         raise ValueError(
             "No valid variants found after normalization. "
             "Check the file format."
         )
 
-    # 4. Annotate via APIs
+    # 4. Annotate
+    _advance("annotating")
     annotated = annotate_variants(variants, mode=mode, max_variants=max_variants)
 
-    # 5. Categorize
-    categories = categorize_variants(annotated)
-
-    # 6. Ancestry
-    ancestry = compute_ancestry(annotated)
-
-    # 7. Risk scores
+    # 5–9. Score + assemble
+    _advance("categorizing")
+    categories  = categorize_variants(annotated)
+    ancestry    = compute_ancestry(annotated)
     risk_scores = compute_risk_scores(annotated)
+    pgx         = analyze_pharmacogenomics(annotated)
+    traits      = analyze_traits(annotated)
 
-    # 8. PGx
-    pgx = analyze_pharmacogenomics(annotated)
-
-    # 9. Traits
-    traits = analyze_traits(annotated)
-
-    # 10. Assemble report
+    _advance("building")
     pathogenic_count = len(categories.get("pathogenic", []))
-
     report_data = {
         "report_id":    str(uuid.uuid4()),
         "name":         name,
@@ -183,7 +176,7 @@ def run_full_pipeline(
     return report_data
 
 
-# ── Routes ───────────────────────────────────────────────────────────────────
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -193,14 +186,9 @@ def index():
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
     """
-    Accepts a multipart file upload, runs the full pipeline,
-    stores the report, returns {report_id, status}.
-
-    Large-file handling:
-      - File is streamed to disk in 1 MB chunks (never fully RAM-buffered)
-      - Size is measured during streaming, not from Content-Length header
-        (which can be faked or absent)
-      - Upload is aborted and the partial file deleted if limit is exceeded
+    Accepts a multipart upload.  Returns {task_id} immediately.
+    Pipeline runs in a background thread; poll /api/status/<task_id> for progress.
+    On completion the status payload includes report_id for redirect.
     """
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -217,10 +205,13 @@ def analyze():
     mode         = request.form.get("mode", "fast")
     max_variants = int(request.form.get("max_variants", 500))
 
-    # ── Stream upload to disk ──────────────────────────────────────
+    # Create task immediately so the client can start polling
     filename = secure_filename(f.filename)
-    filepath = UPLOAD_FOLDER / f"{uuid.uuid4()}_{filename}"
+    task_id  = tasks.create_task(filename=filename)
+    tasks.advance(task_id, "uploading")
 
+    # ── Stream upload to disk ─────────────────────────────────────
+    filepath = UPLOAD_FOLDER / f"{uuid.uuid4()}_{filename}"
     try:
         total_bytes = stream_save(f, filepath)
         size_mb = total_bytes / (1024 * 1024)
@@ -228,97 +219,166 @@ def analyze():
 
         if size_mb > MAX_FILE_SIZE_MB:
             filepath.unlink(missing_ok=True)
+            tasks.fail(task_id, (
+                f"File too large ({size_mb:.1f} MB). "
+                f"Maximum allowed is {MAX_FILE_SIZE_MB} MB. "
+                "For whole-genome VCFs over 700 MB, please pre-filter to SNP-only variants."
+            ))
             return jsonify({
                 "error": (
                     f"File too large ({size_mb:.1f} MB). "
-                    f"Maximum allowed is {MAX_FILE_SIZE_MB} MB. "
-                    "For whole-genome VCFs over 700 MB, please pre-filter to SNP-only variants."
+                    f"Maximum allowed is {MAX_FILE_SIZE_MB} MB."
                 )
             }), 413
 
     except Exception as e:
         filepath.unlink(missing_ok=True)
+        tasks.fail(task_id, "File upload failed. Please try again.")
         logger.error(f"Upload save failed: {e}")
         return jsonify({"error": "File upload failed. Please try again."}), 500
 
-    # ── Run pipeline ───────────────────────────────────────────────
-    try:
-        report_data = run_full_pipeline(
-            str(filepath),
-            name=name,
-            mode=mode,
-            max_variants=max_variants,
-        )
-        report_id = report_data["report_id"]
-        REPORT_STORE[report_id] = report_data
-        logger.info(f"Report {report_id} generated for '{name}' ({size_mb:.1f} MB file)")
-        return jsonify({
-            "report_id":     report_id,
-            "status":        "success",
-            "file_size_mb":  round(size_mb, 1),
-            "total_variants": report_data["summary"]["total_variants"],
-        })
+    tasks.advance(task_id, "upload_done", file_size_mb=round(size_mb, 1))
 
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        logger.exception("Pipeline error")
-        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
-    finally:
+    # ── Run pipeline in background thread ─────────────────────────
+    def _run():
         try:
+            report_data = run_full_pipeline(
+                str(filepath),
+                name=name,
+                mode=mode,
+                max_variants=max_variants,
+                task_id=task_id,
+            )
+            report_id = report_data["report_id"]
+            REPORT_STORE[report_id] = report_data
+            tasks.complete(task_id, report_id)
+            logger.info(f"Report {report_id} ready for task {task_id} ({size_mb:.1f} MB)")
+        except ValueError as e:
+            tasks.fail(task_id, str(e))
+        except Exception as e:
+            logger.exception(f"Pipeline error for task {task_id}")
+            tasks.fail(task_id, f"Analysis failed: {str(e)}")
+        finally:
             filepath.unlink(missing_ok=True)
-        except Exception:
-            pass
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+    return jsonify({
+        "task_id":  task_id,
+        "status":   "accepted",
+        "filename": filename,
+    }), 202
+
+
+@app.route("/api/status/<task_id>")
+def task_status(task_id: str):
+    """
+    Poll endpoint — returns current task state as JSON.
+    Response shape:
+      { task_id, stage, label, pct, report_id, error, file_size_mb, updated_at }
+    """
+    status = tasks.get_status(task_id)
+    if not status:
+        return jsonify({"error": "Task not found"}), 404
+    return jsonify(status)
+
+
+@app.route("/api/status/<task_id>/stream")
+def task_status_stream(task_id: str):
+    """
+    Server-Sent Events stream for real-time progress.
+    The client opens one EventSource; we push updates every 500 ms.
+    Stream closes automatically when stage is 'done' or 'error'.
+
+    Event shape:
+      data: { task_id, stage, label, pct, report_id, error }
+    """
+    def _generate():
+        last_stage = None
+        for _ in range(720):   # max 6 min (720 × 0.5s)
+            status = tasks.get_status(task_id)
+            if not status:
+                yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
+                return
+
+            # Only push when something changed
+            if status["stage"] != last_stage:
+                last_stage = status["stage"]
+                yield f"data: {json.dumps(status)}\n\n"
+
+            if status["stage"] in ("done", "error"):
+                return
+
+            time.sleep(0.5)
+
+        # Timeout safety valve
+        yield f"data: {json.dumps({'stage': 'error', 'label': 'Timeout', 'pct': 0})}\n\n"
+
+    return Response(
+        stream_with_context(_generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control":    "no-cache",
+            "X-Accel-Buffering": "no",   # tell Nginx not to buffer SSE
+        },
+    )
 
 
 @app.route("/api/sample")
 def sample():
-    """
-    Generates a report from built-in sample data (no file upload needed).
-    """
+    """Generates a report from built-in sample data (no file upload needed)."""
     name = request.args.get("name", "Demo User")
     mode = request.args.get("mode", "fast")
 
-    try:
-        sample_variants = generate_sample_variants()
-        variants        = normalize_variants(sample_variants)
-        annotated       = annotate_variants(variants, mode=mode, max_variants=100)
-        categories      = categorize_variants(annotated)
-        ancestry        = compute_ancestry(annotated)
-        risk_scores     = compute_risk_scores(annotated)
-        pgx             = analyze_pharmacogenomics(annotated)
-        traits          = analyze_traits(annotated)
+    task_id = tasks.create_task(filename="sample")
+    tasks.advance(task_id, "parsing")
 
-        report_data = {
-            "report_id":    str(uuid.uuid4()),
-            "name":         name,
-            "generated_at": datetime.now().strftime("%B %d, %Y at %H:%M"),
-            "summary": {
-                "format":             "sample",
-                "mode":               mode,
-                "total_variants":     len(variants),
-                "annotated_variants": len(annotated),
-                "pathogenic_count":   len(categories.get("pathogenic", [])),
-            },
-            "ancestry":         ancestry,
-            "risk_scores":      risk_scores,
-            "pharmacogenomics": pgx,
-            "traits":           traits,
-            "categories":       categories,
-        }
+    def _run():
+        try:
+            sample_variants = generate_sample_variants()
+            tasks.advance(task_id, "normalizing")
+            variants = normalize_variants(sample_variants)
+            tasks.advance(task_id, "annotating")
+            annotated = annotate_variants(variants, mode=mode, max_variants=100)
+            tasks.advance(task_id, "categorizing")
+            categories  = categorize_variants(annotated)
+            ancestry    = compute_ancestry(annotated)
+            risk_scores = compute_risk_scores(annotated)
+            pgx         = analyze_pharmacogenomics(annotated)
+            traits      = analyze_traits(annotated)
+            tasks.advance(task_id, "building")
 
-        report_id = report_data["report_id"]
-        REPORT_STORE[report_id] = report_data
-        return jsonify({"report_id": report_id, "status": "success"})
+            report_data = {
+                "report_id":    str(uuid.uuid4()),
+                "name":         name,
+                "generated_at": datetime.now().strftime("%B %d, %Y at %H:%M"),
+                "summary": {
+                    "format":             "sample",
+                    "mode":               mode,
+                    "total_variants":     len(variants),
+                    "annotated_variants": len(annotated),
+                    "pathogenic_count":   len(categories.get("pathogenic", [])),
+                },
+                "ancestry":         ancestry,
+                "risk_scores":      risk_scores,
+                "pharmacogenomics": pgx,
+                "traits":           traits,
+                "categories":       categories,
+            }
+            report_id = report_data["report_id"]
+            REPORT_STORE[report_id] = report_data
+            tasks.complete(task_id, report_id)
+        except Exception as e:
+            logger.exception("Sample pipeline error")
+            tasks.fail(task_id, str(e))
 
-    except Exception as e:
-        logger.exception("Sample pipeline error")
-        return jsonify({"error": str(e)}), 500
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"task_id": task_id, "status": "accepted"}), 202
 
 
 @app.route("/report/<report_id>")
 def view_report(report_id: str):
-    """Render the interactive HTML dashboard for a report."""
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
@@ -328,21 +388,15 @@ def view_report(report_id: str):
 
 @app.route("/report/<report_id>/pdf")
 def download_pdf(report_id: str):
-    """Generate and stream a PDF for a stored report."""
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
-
     pdf_path = REPORTS_FOLDER / f"{report_id}.pdf"
     try:
         generate_pdf_report(report_data, str(pdf_path))
         name = report_data.get("name", "report").replace(" ", "_").lower()
-        return send_file(
-            str(pdf_path),
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name=f"dna_report_{name}.pdf",
-        )
+        return send_file(str(pdf_path), mimetype="application/pdf",
+                         as_attachment=True, download_name=f"dna_report_{name}.pdf")
     except Exception as e:
         logger.exception("PDF generation error")
         return jsonify({"error": f"PDF generation failed: {e}"}), 500
@@ -350,21 +404,15 @@ def download_pdf(report_id: str):
 
 @app.route("/report/<report_id>/html")
 def download_html(report_id: str):
-    """Generate and stream a standalone HTML report."""
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
-
     html_path = REPORTS_FOLDER / f"{report_id}.html"
     try:
         generate_html_report(report_data, str(html_path))
         name = report_data.get("name", "report").replace(" ", "_").lower()
-        return send_file(
-            str(html_path),
-            mimetype="text/html",
-            as_attachment=True,
-            download_name=f"dna_report_{name}.html",
-        )
+        return send_file(str(html_path), mimetype="text/html",
+                         as_attachment=True, download_name=f"dna_report_{name}.html")
     except Exception as e:
         logger.exception("HTML export error")
         return jsonify({"error": f"HTML export failed: {e}"}), 500
@@ -372,7 +420,6 @@ def download_html(report_id: str):
 
 @app.route("/report/<report_id>/json")
 def download_json(report_id: str):
-    """Return the raw JSON report data."""
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
@@ -391,13 +438,13 @@ def download_json(report_id: str):
 @app.route("/api/health")
 def health():
     return jsonify({
-        "status":          "ok",
-        "reports_stored":  REPORT_STORE.count(),
-        "max_upload_mb":   MAX_FILE_SIZE_MB,
+        "status":         "ok",
+        "reports_stored": REPORT_STORE.count(),
+        "max_upload_mb":  MAX_FILE_SIZE_MB,
     })
 
 
-# ── Error handlers ────────────────────────────────────────────────────────────
+# ── Error handlers ─────────────────────────────────────────────────────────────
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"error": "Not found"}), 404
@@ -406,7 +453,7 @@ def not_found(e):
 def request_entity_too_large(e):
     return jsonify({
         "error": (
-            f"File exceeds the 2 GB hard limit. "
+            "File exceeds the 2 GB hard limit. "
             "Please pre-filter your VCF to SNP-only variants before uploading."
         )
     }), 413
@@ -416,7 +463,7 @@ def server_error(e):
     return jsonify({"error": "Internal server error"}), 500
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"

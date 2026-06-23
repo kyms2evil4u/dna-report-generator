@@ -99,10 +99,19 @@
 
     /* Progress */
     #progressWrap { display:none; margin-top: 28px; }
-    .progress-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-    .progress-fill  { height: 100%; background: var(--primary); border-radius: 3px;
-                      width: 0%; transition: width 0.4s ease; }
-    .progress-label { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    .progress-stage { }
+    .stage-label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px;
+    }
+    .progress-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-fill  {
+      height: 100%; background: var(--primary); border-radius: 4px;
+      width: 0%; transition: width 0.35s ease;
+    }
+    .progress-fill-accent { background: var(--accent); }
+    .progress-label { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 18px; }
 
     /* How it works */
     .how-section { margin-top: 56px; }
@@ -224,13 +233,31 @@
       </button>
     </div>
 
+
     <!-- Progress -->
     <div id="progressWrap">
-      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-      <div class="progress-label" id="progressLabel">Uploading file...</div>
+      <!-- Upload progress (XHR) -->
+      <div class="progress-stage" id="stageUpload">
+        <div class="stage-label">
+          <span>⬆️ Uploading</span>
+          <span id="uploadPct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="uploadFill"></div>
+        </div>
+      </div>
+      <!-- Analysis progress (SSE polling) -->
+      <div class="progress-stage" id="stageAnalysis" style="margin-top:14px; display:none;">
+        <div class="stage-label">
+          <span id="analysisLabel">Preparing…</span>
+          <span id="analysisPct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill progress-fill-accent" id="analysisFill"></div>
+        </div>
+      </div>
+      <div class="progress-label" id="progressLabel"></div>
     </div>
-  </div>
-
   <!-- How it works -->
   <div class="how-section">
     <h2>How It Works</h2>
@@ -310,15 +337,16 @@
 </footer>
 
 <script>
-  const fileInput = document.getElementById("fileInput");
-  const dropzone  = document.getElementById("dropzone");
-  const analyzeBtn= document.getElementById("analyzeBtn");
-  const fileInfo  = document.getElementById("fileInfo");
-  const alertBox  = document.getElementById("alertBox");
+  const fileInput  = document.getElementById("fileInput");
+  const dropzone   = document.getElementById("dropzone");
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const fileInfo   = document.getElementById("fileInfo");
+  const alertBox   = document.getElementById("alertBox");
 
   let selectedFile = null;
+  let activeSource = null;   // EventSource for SSE
 
-  // ── Drag and drop ────────────────────────────────────────────────────────
+  // ── Drag and drop ─────────────────────────────────────────────────────────
   dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
   dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
   dropzone.addEventListener("drop", e => {
@@ -326,21 +354,25 @@
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   });
-
   fileInput.addEventListener("change", () => {
     if (fileInput.files[0]) handleFile(fileInput.files[0]);
   });
 
   function handleFile(file) {
-    const allowed = [".txt", ".csv", ".vcf"];
-    const ext = "." + file.name.split(".").pop().toLowerCase();
-    if (!allowed.includes(ext)) {
-      showAlert("Unsupported file type. Please upload a .txt, .csv, or .vcf file.");
+    const name = file.name.toLowerCase();
+    const ok   = name.endsWith(".txt") || name.endsWith(".csv") ||
+                 name.endsWith(".vcf") || name.endsWith(".vcf.gz") ||
+                 name.endsWith(".txt.gz");
+    if (!ok) {
+      showAlert("Unsupported file type. Please upload a .txt, .csv, .vcf, or .vcf.gz file.");
       return;
     }
     selectedFile = file;
     document.getElementById("fileName").textContent = "📄 " + file.name;
-    document.getElementById("fileMeta").textContent = `${(file.size / 1024).toFixed(1)} KB · ${ext.toUpperCase()}`;
+    const kb = file.size < 1024 * 1024
+      ? (file.size / 1024).toFixed(1) + " KB"
+      : (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    document.getElementById("fileMeta").textContent = `${kb} · ${name.split(".").pop().toUpperCase()}`;
     fileInfo.style.display = "block";
     analyzeBtn.disabled = false;
     hideAlert();
@@ -351,17 +383,131 @@
   function showAlert(msg) { alertBox.textContent = msg; alertBox.style.display = "block"; }
   function hideAlert()    { alertBox.style.display = "none"; }
 
-  // ── Start Analysis ───────────────────────────────────────────────────────
-  async function startAnalysis() {
+  // ── Progress helpers ──────────────────────────────────────────────────────
+  function showProgressWrap() {
+    document.getElementById("progressWrap").style.display = "block";
+  }
+  function hideProgressWrap() {
+    document.getElementById("progressWrap").style.display = "none";
+  }
+
+  function setUploadProgress(pct, label) {
+    document.getElementById("uploadFill").style.width = pct + "%";
+    document.getElementById("uploadPct").textContent  = Math.round(pct) + "%";
+    document.getElementById("progressLabel").textContent = label || "";
+  }
+
+  function showAnalysisStage() {
+    document.getElementById("stageAnalysis").style.display = "block";
+  }
+  function setAnalysisProgress(pct, label) {
+    document.getElementById("analysisFill").style.width   = pct + "%";
+    document.getElementById("analysisPct").textContent    = Math.round(pct) + "%";
+    document.getElementById("analysisLabel").textContent  = label || "Working…";
+    document.getElementById("progressLabel").textContent  = "";
+  }
+
+  function resetProgress() {
+    document.getElementById("stageAnalysis").style.display = "none";
+    setUploadProgress(0, "");
+    setAnalysisProgress(0, "Preparing…");
+    hideProgressWrap();
+  }
+
+  // ── Poll task status via SSE ──────────────────────────────────────────────
+  function trackTaskSSE(taskId) {
+    showAnalysisStage();
+
+    if (activeSource) { activeSource.close(); activeSource = null; }
+
+    // Graceful fallback: if SSE isn't supported, use polling
+    if (typeof EventSource === "undefined") {
+      pollTaskStatus(taskId);
+      return;
+    }
+
+    const es = new EventSource(`/api/status/${taskId}/stream`);
+    activeSource = es;
+
+    es.onmessage = (event) => {
+      let data;
+      try { data = JSON.parse(event.data); } catch { return; }
+
+      if (data.error && data.stage !== "error") {
+        showAlert("Status error: " + data.error);
+        es.close(); return;
+      }
+
+      setAnalysisProgress(data.pct || 0, data.label || "Working…");
+
+      if (data.stage === "done" && data.report_id) {
+        setAnalysisProgress(100, "Complete! Loading report…");
+        es.close();
+        activeSource = null;
+        setTimeout(() => { window.location.href = `/report/${data.report_id}`; }, 500);
+      } else if (data.stage === "error") {
+        showAlert("Analysis failed: " + (data.error || "Unknown error"));
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = "🔬 Analyze DNA";
+        resetProgress();
+        es.close();
+        activeSource = null;
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      activeSource = null;
+      // Fallback to HTTP polling
+      pollTaskStatus(taskId);
+    };
+  }
+
+  // ── HTTP polling fallback ─────────────────────────────────────────────────
+  function pollTaskStatus(taskId, attempts) {
+    if (!attempts) attempts = 0;
+    if (attempts > 720) {   // 6 min max
+      showAlert("Analysis timed out. Please try again.");
+      analyzeBtn.disabled    = false;
+      analyzeBtn.textContent = "🔬 Analyze DNA";
+      resetProgress();
+      return;
+    }
+    showAnalysisStage();
+
+    fetch(`/api/status/${taskId}`)
+      .then(r => r.json())
+      .then(data => {
+        setAnalysisProgress(data.pct || 0, data.label || "Working…");
+
+        if (data.stage === "done" && data.report_id) {
+          setAnalysisProgress(100, "Complete! Loading report…");
+          setTimeout(() => { window.location.href = `/report/${data.report_id}`; }, 500);
+        } else if (data.stage === "error") {
+          showAlert("Analysis failed: " + (data.error || "Unknown error"));
+          analyzeBtn.disabled    = false;
+          analyzeBtn.textContent = "🔬 Analyze DNA";
+          resetProgress();
+        } else {
+          setTimeout(() => pollTaskStatus(taskId, attempts + 1), 800);
+        }
+      })
+      .catch(() => setTimeout(() => pollTaskStatus(taskId, attempts + 1), 1500));
+  }
+
+  // ── Main upload flow ──────────────────────────────────────────────────────
+  function startAnalysis() {
     if (!selectedFile) { showAlert("Please select a file first."); return; }
 
     const name    = document.getElementById("userName").value || "User";
     const mode    = document.getElementById("analysisMode").value;
     const maxVar  = document.getElementById("maxVariants").value;
 
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = "⏳ Analyzing...";
-    showProgress("Uploading file...", 10);
+    analyzeBtn.disabled    = true;
+    analyzeBtn.textContent = "⏳ Uploading…";
+    hideAlert();
+    showProgressWrap();
+    setUploadProgress(0, "Starting upload…");
 
     const formData = new FormData();
     formData.append("file", selectedFile);
@@ -369,55 +515,82 @@
     formData.append("mode", mode);
     formData.append("max_variants", maxVar);
 
-    try {
-      showProgress("Parsing variants...", 25);
-      const res = await fetch("/api/analyze", { method: "POST", body: formData });
+    // Use XHR (not fetch) for real upload progress events
+    const xhr = new XMLHttpRequest();
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Analysis failed");
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        const pct = (e.loaded / e.total) * 100;
+        const mb  = (e.loaded / (1024 * 1024)).toFixed(1);
+        const tot = (e.total  / (1024 * 1024)).toFixed(1);
+        setUploadProgress(pct, `Uploading ${mb} / ${tot} MB…`);
+        analyzeBtn.textContent = `⬆️ ${Math.round(pct)}%`;
       }
+    });
 
-      showProgress("Annotating with genomic databases...", 60);
-      const data = await res.json();
-      showProgress("Generating report...", 90);
+    xhr.upload.addEventListener("load", () => {
+      setUploadProgress(100, "Upload complete — analyzing…");
+      analyzeBtn.textContent = "⏳ Analyzing…";
+    });
 
-      // Redirect to report page
-      const reportId = data.report_id;
-      showProgress("Complete! Redirecting...", 100);
-      setTimeout(() => { window.location.href = `/report/${reportId}`; }, 600);
+    xhr.addEventListener("load", () => {
+      if (xhr.status === 202) {
+        let resp;
+        try { resp = JSON.parse(xhr.responseText); } catch {
+          showAlert("Unexpected server response. Please try again.");
+          analyzeBtn.disabled = false; analyzeBtn.textContent = "🔬 Analyze DNA";
+          resetProgress(); return;
+        }
+        trackTaskSSE(resp.task_id);
+      } else if (xhr.status === 413) {
+        let msg = "File too large.";
+        try { msg = JSON.parse(xhr.responseText).error; } catch {}
+        showAlert(msg);
+        analyzeBtn.disabled = false; analyzeBtn.textContent = "🔬 Analyze DNA";
+        resetProgress();
+      } else {
+        let msg = "Upload failed.";
+        try { msg = JSON.parse(xhr.responseText).error; } catch {}
+        showAlert("Error: " + msg);
+        analyzeBtn.disabled = false; analyzeBtn.textContent = "🔬 Analyze DNA";
+        resetProgress();
+      }
+    });
 
-    } catch (err) {
-      showAlert("Error: " + err.message);
-      analyzeBtn.disabled = false;
-      analyzeBtn.textContent = "🔬 Analyze DNA";
-      hideProgress();
-    }
+    xhr.addEventListener("error", () => {
+      showAlert("Network error during upload. Please check your connection and try again.");
+      analyzeBtn.disabled = false; analyzeBtn.textContent = "🔬 Analyze DNA";
+      resetProgress();
+    });
+
+    xhr.open("POST", "/api/analyze");
+    xhr.send(formData);
   }
 
-  // ── Sample Data ──────────────────────────────────────────────────────────
+  // ── Sample Data ───────────────────────────────────────────────────────────
   async function loadSample() {
     const name = document.getElementById("userName").value || "Demo User";
     const mode = document.getElementById("analysisMode").value;
-    showProgress("Loading sample data...", 30);
+
+    showProgressWrap();
+    setUploadProgress(100, "Sample data loaded");
+    showAnalysisStage();
+    setAnalysisProgress(10, "Generating sample variants…");
+
     try {
       const res = await fetch(`/api/sample?name=${encodeURIComponent(name)}&mode=${mode}`);
-      if (!res.ok) throw new Error("Sample analysis failed");
+      if (!res.ok) throw new Error("Sample request failed");
       const data = await res.json();
-      showProgress("Complete! Redirecting...", 100);
-      setTimeout(() => { window.location.href = `/report/${data.report_id}`; }, 500);
+      if (data.task_id) {
+        trackTaskSSE(data.task_id);
+      } else if (data.report_id) {
+        window.location.href = `/report/${data.report_id}`;
+      }
     } catch (err) {
       showAlert("Sample error: " + err.message);
-      hideProgress();
+      resetProgress();
     }
   }
-
-  function showProgress(label, pct) {
-    document.getElementById("progressWrap").style.display = "block";
-    document.getElementById("progressFill").style.width = pct + "%";
-    document.getElementById("progressLabel").textContent = label;
-  }
-  function hideProgress() { document.getElementById("progressWrap").style.display = "none"; }
 </script>
 </body>
 </html>
