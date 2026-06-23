@@ -4,9 +4,10 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
+  # ── Tests ──────────────────────────────────────────────────────
   test:
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -38,8 +39,8 @@ jobs:
             --cov-report=xml \
             -v
         env:
-          FLASK_ENV: testing
-          SECRET_KEY: ci-test-secret-key-not-for-production
+          FLASK_ENV:  testing
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
@@ -48,6 +49,7 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false
 
+  # ── Lint ───────────────────────────────────────────────────────
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -63,12 +65,13 @@ jobs:
       - name: Install linters
         run: pip install flake8 ruff
 
-      - name: Run ruff (fast linter)
+      - name: Run ruff
         run: ruff check . --ignore E501,W503
 
       - name: Run flake8
         run: flake8 . --max-line-length=120 --exclude=.git,__pycache__,deploy,templates
 
+  # ── Docker build check ─────────────────────────────────────────
   docker:
     name: Docker Build Check
     runs-on: ubuntu-latest
@@ -80,14 +83,63 @@ jobs:
       - name: Build Docker image
         run: docker build -t dna-report-generator:ci .
 
-      - name: Verify image starts
+      - name: Verify image starts and health check passes
         run: |
           docker run -d \
             --name dna_test \
-            -e SECRET_KEY=ci-test \
+            -e SECRET_KEY=${{ secrets.SECRET_KEY }} \
             -e FLASK_ENV=production \
             -p 5000:5000 \
             dna-report-generator:ci
-          sleep 8
-          curl -f http://localhost:5000/api/health || (docker logs dna_test && exit 1)
+          sleep 10
+          curl -f http://localhost:5000/api/health \
+            || (docker logs dna_test && exit 1)
           docker stop dna_test
+
+  # ── Auto-deploy to Railway (main only) ─────────────────────────
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: [test, lint, docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Verify deployment health
+        run: |
+          echo "Waiting 30s for Railway to propagate..."
+          sleep 30
+          # Railway sets RAILWAY_PUBLIC_DOMAIN in the env — use it if available
+          if [ -n "${{ vars.RAILWAY_PUBLIC_DOMAIN }}" ]; then
+            curl -f https://${{ vars.RAILWAY_PUBLIC_DOMAIN }}/api/health \
+              && echo "✅ Production health check passed" \
+              || echo "⚠️  Health check failed — check Railway dashboard"
+          else
+            echo "ℹ️  RAILWAY_PUBLIC_DOMAIN not set — skipping live health check"
+          fi
+
+      - name: Comment deploy status on PR (if applicable)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success'
+              ? '✅ Deployed to Railway successfully!'
+              : '❌ Railway deployment failed — check the Actions log.';
+            if (context.payload.pull_request) {
+              github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: status,
+              });
+            }
