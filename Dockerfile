@@ -49,21 +49,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production \
     PORT=5000
 
-EXPOSE 5000
+EXPOSE 5000 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD curl -f http://localhost:5000/api/health || exit 1
+  CMD curl -f http://localhost:${PORT:-5000}/api/health || exit 1
 
-# Production server: Gunicorn with 4 async workers
-CMD ["gunicorn", \
-     "--bind", "0.0.0.0:5000", \
-     "--workers", "4", \
-     "--worker-class", "gthread", \
-     "--threads", "2", \
-     "--timeout", "300", \
-     "--keep-alive", "5", \
-     "--log-level", "info", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "app:app"]
+# Production server: Gunicorn — use shell form so $PORT is expanded by Railway
+CMD /bin/sh -c "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --worker-class gthread --threads 4 --timeout 900 --graceful-timeout 30 --keep-alive 5 --log-level info --access-logfile - --error-logfile - app:app"
