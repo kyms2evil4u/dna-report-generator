@@ -3,11 +3,9 @@ Tests for all file format parsers and the format detector.
 Uses real in-memory file content — no disk I/O, no API calls.
 """
 
-import io
 import os
 import tempfile
 import textwrap
-import pytest
 
 from parsers.format_detector   import detect_format
 from parsers.twentythreeme_parser import parse_23andme

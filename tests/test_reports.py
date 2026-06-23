@@ -5,7 +5,6 @@ Verifies output exists, is non-empty, and contains expected content.
 
 import os
 import tempfile
-import pytest
 
 from reports.pdf_generator  import generate_pdf_report
 from reports.html_generator import generate_html_report

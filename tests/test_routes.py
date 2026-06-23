@@ -6,8 +6,7 @@ Pipeline calls are mocked so no real parsing/API work happens.
 import io
 import json
 import uuid
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 # ── Shared mock pipeline return ───────────────────────────────────────────────

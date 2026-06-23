@@ -5,11 +5,10 @@ all without real disk I/O beyond small temp files.
 """
 
 import io
-import os
 import uuid
 import tempfile
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 

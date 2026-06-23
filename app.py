@@ -39,6 +39,7 @@ from api import annotate_variants
 from analysis import categorize_variants, compute_ancestry, compute_risk_scores, analyze_pharmacogenomics, analyze_traits
 from reports import generate_pdf_report, generate_html_report
 from data.sample_generator import generate_sample_variants
+from store import get_store
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -60,7 +61,6 @@ REPORTS_FOLDER     = Path(tempfile.gettempdir()) / "dna_reports"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 REPORTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
-from store import get_store
 REPORT_STORE = get_store()
 
 

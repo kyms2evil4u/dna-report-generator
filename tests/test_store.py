@@ -5,8 +5,7 @@ Redis and PostgreSQL clients are mocked — tests run without any running servic
 
 import json
 import uuid
-import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 
 def _make_report(name="Store Test User"):

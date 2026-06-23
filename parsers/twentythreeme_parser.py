@@ -4,7 +4,6 @@ Format: TSV with comment lines starting with '#'
 Columns: rsid, chromosome, position, genotype
 """
 
-import pandas as pd
 import re
 from typing import List, Dict
 

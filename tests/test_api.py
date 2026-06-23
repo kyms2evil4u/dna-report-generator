@@ -4,7 +4,6 @@ All external HTTP calls are mocked with pytest-mock / unittest.mock
 so tests run offline and never hit real endpoints.
 """
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 
@@ -200,7 +199,7 @@ class TestAggregator:
         mock_cv.return_value = minimal_variants[:2]
         mock_mv.return_value = minimal_variants[:2]
 
-        result = annotate_variants(minimal_variants, mode="fast", max_variants=2)
+        annotate_variants(minimal_variants, mode="fast", max_variants=2)
         # The aggregator should cap at max_variants before calling APIs
         first_call_args = mock_cv.call_args[0][0]
         assert len(first_call_args) <= 2

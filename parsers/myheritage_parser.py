@@ -5,7 +5,6 @@ Columns: RSID, CHROMOSOME, POSITION, RESULT
 """
 
 import csv
-import re
 from typing import List, Dict
 
 

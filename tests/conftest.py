@@ -2,7 +2,6 @@
 Pytest configuration — shared fixtures used across all test modules.
 """
 
-import json
 import uuid
 import pytest
 

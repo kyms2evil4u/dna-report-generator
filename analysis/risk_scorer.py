@@ -5,6 +5,7 @@ using published GWAS odds ratios.
 """
 
 from typing import List, Dict
+import math
 
 # Polygenic risk score definitions
 # Format: condition -> [{"rsid", "risk_allele", "log_or", "weight"}]
@@ -54,7 +55,6 @@ PRS_DEFINITIONS = {
     },
 }
 
-import math
 
 
 def _count_risk_alleles(variant: Dict, risk_allele: str) -> int:

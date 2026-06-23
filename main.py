@@ -3,7 +3,6 @@ CLI Entry Point — DNA Report Generator
 Usage: python main.py [COMMAND] [OPTIONS]
 """
 
-import os
 import sys
 import json
 import logging
@@ -15,7 +14,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.panel import Panel
-from rich.text import Text
 from rich import box
 
 console = Console()

@@ -75,9 +75,12 @@ class ReportStore:
         self._redis = _get_redis()
         self._pg    = _get_pg_conn()
         mode = []
-        if self._redis: mode.append("Redis")
-        if self._pg:    mode.append("PostgreSQL")
-        if not mode:    mode.append("in-memory")
+        if self._redis:
+            mode.append("Redis")
+        if self._pg:
+            mode.append("PostgreSQL")
+        if not mode:
+            mode.append("in-memory")
         logger.info(f"ReportStore initialized: {' + '.join(mode)}")
 
     # ── Public API ──────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ def parse_vcf(filepath: str) -> List[Dict]:
     Parse a VCF file and return normalized variant dicts.
     """
     try:
-        import vcf as pyvcf
+        import vcf as pyvcf  # noqa: F401
         return _parse_with_pyvcf(filepath)
     except ImportError:
         return _parse_vcf_manual(filepath)

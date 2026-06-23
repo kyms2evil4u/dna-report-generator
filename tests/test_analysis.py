@@ -3,7 +3,6 @@ Tests for all analysis modules.
 All inputs are in-memory fixtures — zero API calls.
 """
 
-import pytest
 
 from analysis.categorizer       import categorize_variants
 from analysis.ancestry          import compute_ancestry

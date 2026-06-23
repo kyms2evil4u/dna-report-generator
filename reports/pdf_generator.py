@@ -3,22 +3,18 @@ PDF Report Generator using ReportLab.
 Produces a professional, multi-section DNA report.
 """
 
-import os
 from datetime import datetime
 from typing import Dict, Any
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     HRFlowable, PageBreak, KeepTogether,
 )
-from reportlab.graphics.shapes import Drawing, Rect
-from reportlab.graphics.charts.barcharts import HorizontalBarChart
-from reportlab.graphics import renderPDF
 
 
 # ── Color palette ────────────────────────────────────────────────────────────
@@ -38,7 +34,7 @@ COLORS = {
 
 
 def _build_styles():
-    styles = getSampleStyleSheet()
+    _ = getSampleStyleSheet()  # noqa: F841
     custom = {
         "Title": ParagraphStyle("Title", fontSize=26, textColor=COLORS["primary"], spaceAfter=8, fontName="Helvetica-Bold", alignment=TA_LEFT),
         "Subtitle": ParagraphStyle("Subtitle", fontSize=12, textColor=COLORS["muted"], spaceAfter=4, fontName="Helvetica"),
