@@ -331,15 +331,16 @@
         </div>
         <div class="ancestry-legend">
           {% set colors_map = {"AFR": "#4A90D9", "EUR": "#7EB8F7", "EAS": "#5BB5A2", "SAS": "#A8D8A8", "AMR": "#B8A8D8"} %}
-          {% for pop, pct in report.ancestry.composition.items() | sort(attribute='1', reverse=true) %}
+          {% set pop_labels = report.ancestry.labels if report.ancestry.labels is defined else {"AFR": "African", "EUR": "European", "EAS": "East Asian", "SAS": "South Asian", "AMR": "Latino/Admixed American"} %}
+          {% for entry in report.ancestry.composition %}
           <div class="ancestry-legend-item">
             <div class="ancestry-name">
-              <div class="ancestry-dot" style="background: {{ colors_map.get(pop, '#999') }}"></div>
-              {{ report.ancestry.labels.get(pop, pop) }}
+              <div class="ancestry-dot" style="background: {{ colors_map.get(entry.population, '#999') }}"></div>
+              {{ pop_labels.get(entry.population, entry.population) }}
             </div>
             <div>
-              <div class="ancestry-pct">{{ pct }}%</div>
-              <div class="ancestry-bar-mini" style="width: {{ pct * 2 | int }}px; background: {{ colors_map.get(pop, '#999') }}; min-width: 4px;"></div>
+              <div class="ancestry-pct">{{ entry.percentage }}%</div>
+              <div class="ancestry-bar-mini" style="width: {{ (entry.percentage * 2) | int }}px; background: {{ colors_map.get(entry.population, '#999') }}; min-width: 4px;"></div>
             </div>
           </div>
           {% endfor %}
@@ -370,7 +371,7 @@
           <div class="risk-bar-fill {{ rs.risk_tier }}" style="width: {{ [rs.adjusted_risk_pct * 2, 100] | min }}%"></div>
         </div>
         <p style="font-size:11px;color:var(--muted);margin-top:4px;">
-          {{ rs.description }} &nbsp;·&nbsp; {{ rs.snps_analyzed }}/{{ rs.snps_total }} SNPs found in your data
+          {% if rs.description is defined and rs.description %}{{ rs.description }} &nbsp;·&nbsp; {% endif %}{{ rs.snps_analyzed }}/{{ rs.snps_total }} SNPs found in your data
         </p>
       </div>
       {% else %}
@@ -572,7 +573,8 @@
     const canvas = document.getElementById("ancestryDonut");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const comp = REPORT_DATA.ancestry?.composition || {};
+    const compArr = REPORT_DATA.ancestry?.composition || [];
+    const comp = Object.fromEntries(compArr.map(e => [e.population, e.percentage]));
     const colorMap = { AFR: "#4A90D9", EUR: "#7EB8F7", EAS: "#5BB5A2", SAS: "#A8D8A8", AMR: "#B8A8D8" };
 
     const cx = 90, cy = 90, r = 70, inner = 45;

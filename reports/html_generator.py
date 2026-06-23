@@ -22,6 +22,14 @@ def generate_html_report(report_data: Dict, output_path: str) -> str:
         autoescape=select_autoescape(["html"]),
     )
 
+    # Register custom filters
+    def format_number(value):
+        try:
+            return f"{int(value):,}"
+        except (TypeError, ValueError):
+            return value
+    env.filters["format_number"] = format_number
+
     template = env.get_template("report.html")
 
     # Serialize data for JavaScript embedding

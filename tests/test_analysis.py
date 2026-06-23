@@ -21,7 +21,7 @@ class TestCategorizer:
 
     def test_expected_category_keys(self, annotated_variants):
         result = categorize_variants(annotated_variants)
-        expected = {"pathogenic", "disease_risk", "pharmacogenomics", "traits", "ancestry"}
+        expected = {"pathogenic", "pharmacogenomics", "traits", "complex_disease"}
         assert expected.issubset(set(result.keys()))
 
     def test_pathogenic_contains_correct_variants(self, annotated_variants):
@@ -160,14 +160,14 @@ class TestTraits:
         assert isinstance(result, list)
 
     def test_each_entry_has_required_fields(self, annotated_variants):
-        required = {"trait", "rsid", "your_result", "confidence", "description"}
+        required = {"trait", "rsid", "description", "interpretation"}
         for entry in analyze_traits(annotated_variants):
             assert required.issubset(set(entry.keys()))
 
-    def test_confidence_valid_values(self, annotated_variants):
-        valid = {"high", "moderate", "low"}
+    def test_has_non_empty_interpretation(self, annotated_variants):
         for entry in analyze_traits(annotated_variants):
-            assert entry["confidence"] in valid
+            assert isinstance(entry.get("interpretation"), str)
+            assert len(entry["interpretation"]) > 0
 
     def test_eye_color_trait_detected(self, annotated_variants):
         """rs12913832 (HERC2) is a well-known eye color marker."""

@@ -26,6 +26,9 @@ def parse_23andme(filepath: str) -> List[Dict]:
             # Skip header row if present
             if rsid.lower() == "rsid":
                 continue
+            # Skip invalid rsids (must be rs followed by digits)
+            if not rsid.startswith("rs") or not rsid[2:].isdigit():
+                continue
 
             # Skip internal IDs (i-prefixed, non-dbSNP)
             if rsid.startswith("i") and not rsid.startswith("rs"):

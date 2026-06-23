@@ -191,7 +191,7 @@ def advance(task_id: str, stage: str, **extra) -> None:
     _save(task_id, data)
 
 
-def fail(task_id: str, message: str) -> None:
+def fail(task_id: str, message: str, error_type: str = "error") -> None:
     """Mark a task as failed with an error message."""
     _clear_cancel_flag(task_id)
     data = _load(task_id)
@@ -199,6 +199,7 @@ def fail(task_id: str, message: str) -> None:
         return
     data.update({
         "stage":      "error",
+        "error_type": error_type,
         "label":      "Analysis failed",
         "pct":        0,
         "error":      message,

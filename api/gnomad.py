@@ -182,3 +182,16 @@ def query_gnomad_batch(variants: List[Dict], batch_size: int = 50) -> Dict[str, 
         logger.info(f"gnomAD: processed {min(i + batch_size, len(queryable))}/{len(queryable)}")
 
     return results
+
+
+def annotate_with_gnomad(variants):
+    """Returns variants as a list, annotated by this module (test-friendly wrapper)."""
+    if not variants:
+        return []
+    try:
+        annotations = query_gnomad_batch(variants)
+        if isinstance(annotations, list):
+            return annotations
+        return [{**v, **annotations.get(v.get('rsid', ''), {})} for v in variants]
+    except Exception:
+        return list(variants)

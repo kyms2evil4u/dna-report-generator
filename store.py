@@ -85,6 +85,19 @@ class ReportStore:
 
     # ── Public API ──────────────────────────────────────────────────────────
 
+    # ── Dict-like interface (used by app.py as REPORT_STORE[id] = data) ────
+    def __setitem__(self, report_id: str, report_data: dict) -> None:
+        self.save(report_data)
+
+    def __getitem__(self, report_id: str):
+        result = self.get(report_id)
+        if result is None:
+            raise KeyError(report_id)
+        return result
+
+    def __contains__(self, report_id: str) -> bool:
+        return self.get(report_id) is not None
+
     def save(self, report_data: dict) -> str:
         """
         Persist a report. Returns the report_id.

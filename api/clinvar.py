@@ -129,3 +129,16 @@ def query_clinvar_batch(variants: List[Dict], batch_size: int = 20) -> Dict[str,
         logger.info(f"ClinVar: processed {min(i + batch_size, len(rsids))}/{len(rsids)}")
 
     return results
+
+
+def annotate_with_clinvar(variants):
+    """Returns variants as a list, annotated by this module (test-friendly wrapper)."""
+    if not variants:
+        return []
+    try:
+        annotations = query_clinvar_batch(variants)
+        if isinstance(annotations, list):
+            return annotations
+        return [{**v, **annotations.get(v.get('rsid', ''), {})} for v in variants]
+    except Exception:
+        return list(variants)

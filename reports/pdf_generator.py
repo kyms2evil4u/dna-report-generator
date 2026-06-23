@@ -174,7 +174,7 @@ def generate_pdf_report(report_data: Dict, output_path: str) -> str:
         story.append(Spacer(1, 0.1 * inch))
 
         anc_data = [["Population", "Estimated %", "Confidence"]]
-        for pop_code, pct in sorted(comp.items(), key=lambda x: x[1], reverse=True):
+        for pop_code, pct in [(e["population"], e["percentage"]) for e in (sorted(comp, key=lambda e: e["percentage"], reverse=True) if isinstance(comp, list) else [{"population": k, "percentage": v} for k, v in sorted(comp.items(), key=lambda x: x[1], reverse=True)])]:
             label = labels.get(pop_code, pop_code)
             bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
             anc_data.append([label, f"{pct:.1f}%", bar[:20]])
@@ -199,7 +199,7 @@ def generate_pdf_report(report_data: Dict, output_path: str) -> str:
     if risk_scores:
         for rs in risk_scores[:8]:  # top 8
             row = KeepTogether([
-                Paragraph(f"<b>{rs['condition']}</b> — {rs['description']}", styles["H3"]),
+                Paragraph(f"<b>{rs['condition']}</b>{ ' — ' + rs['description'] if rs.get('description') else ''}", styles["H3"]),
                 Paragraph(
                     f"Risk Level: <b>{rs['risk_label']}</b> | "
                     f"Your estimated lifetime risk: <b>{rs['adjusted_risk_pct']}%</b> "
@@ -273,7 +273,7 @@ def generate_pdf_report(report_data: Dict, output_path: str) -> str:
     if traits:
         for t in traits:
             story.append(Paragraph(
-                f"<b>{t.get('icon','')} {t['trait']}</b> ({t['gene']}) — {t['interpretation']}",
+                f"<b>{t.get('icon','')} {t['trait']}</b>{' (' + t['gene'] + ')' if t.get('gene') else ''} — {t.get('interpretation') or t.get('your_result','') or t.get('description','')}",
                 styles["Body"]
             ))
     story.append(PageBreak())

@@ -102,7 +102,7 @@ def compute_ancestry(variants: List[Dict]) -> Dict:
     if markers_used == 0:
         # No AIMs found — return uniform distribution
         return {
-            "composition": {pop: 100.0 / len(populations) for pop in populations},
+            "composition": [{"population": pop, "percentage": round(100.0 / len(populations), 1)} for pop in populations],
             "top_population": "Unknown",
             "confidence": 0.0,
             "markers_used": 0,
@@ -114,13 +114,17 @@ def compute_ancestry(variants: List[Dict]) -> Dict:
     max_ll = max(log_likelihoods.values())
     exp_scores = {pop: math.exp(ll - max_ll) for pop, ll in log_likelihoods.items()}
     total = sum(exp_scores.values())
-    composition = {
+    composition_dict = {
         pop: round((score / total) * 100, 1)
         for pop, score in exp_scores.items()
     }
+    composition = [
+        {"population": pop, "percentage": pct}
+        for pop, pct in sorted(composition_dict.items(), key=lambda x: x[1], reverse=True)
+    ]
 
-    top_pop = max(composition, key=composition.get)
-    confidence = composition[top_pop] / 100.0
+    top_pop = max(composition_dict, key=composition_dict.get)
+    confidence = composition_dict[top_pop] / 100.0
 
     return {
         "composition": composition,

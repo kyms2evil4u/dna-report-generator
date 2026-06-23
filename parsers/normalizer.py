@@ -27,6 +27,9 @@ def normalize_variants(raw_variants: List[Dict]) -> List[Dict]:
         rsid = v.get("rsid", "").strip()
         if not rsid or not rsid.startswith("rs"):
             continue
+        # Reject non-numeric rsids like 'rs--', 'rsXYZ' (only rs + digits valid)
+        if not rsid[2:].isdigit():
+            continue
 
         # Deduplicate by rsid
         if rsid in seen_rsids:

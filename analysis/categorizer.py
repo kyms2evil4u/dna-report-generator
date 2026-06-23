@@ -101,13 +101,14 @@ def categorize_variants(annotated_variants: List[Dict]) -> Dict[str, List[Dict]]
             categories.setdefault(cat, []).append(v)
             assigned = True
 
-        # 2. Pathogenic from ClinVar annotation (even if not in catalog)
-        if not assigned:
-            sig = v.get("clinical_significance", "") or ""
-            if any(term in sig for term in PATHOGENIC_TERMS):
+        # 2. Pathogenic from ClinVar annotation
+        # Always check — even catalog variants may have pathogenic ClinVar data
+        sig = v.get("clinical_significance", "") or ""
+        if any(term in sig for term in PATHOGENIC_TERMS):
+            if v not in categories["pathogenic"]:
                 v["category"] = "pathogenic"
                 categories["pathogenic"].append(v)
-                assigned = True
+            assigned = True
 
         # 3. High CADD score -> flag as potential pathogenic
         if not assigned:

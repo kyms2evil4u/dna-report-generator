@@ -12,9 +12,28 @@ from .clinvar import query_clinvar_batch
 from .ensembl_vep import query_vep_batch
 from .myvariant import query_myvariant_batch
 from .gnomad import query_gnomad_batch
+# Test-patchable aliases (tests patch these names on the module)
+annotate_with_clinvar = query_clinvar_batch
+annotate_with_ensembl_vep = query_vep_batch
+annotate_with_myvariant = query_myvariant_batch
+annotate_with_gnomad = query_gnomad_batch
 
 logger = logging.getLogger(__name__)
 
+
+
+def _to_rsid_dict(result, original_variants):
+    """Accept either a {rsid: ann_dict} dict or a list of annotated variants; always return a dict."""
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, list):
+        out = {}
+        for item in result:
+            rsid = item.get('rsid', '')
+            if rsid:
+                out[rsid] = item
+        return out
+    return {}
 
 def annotate_variants(
     variants: List[Dict],
@@ -49,45 +68,45 @@ def annotate_variants(
     if mode == "fast":
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
-                executor.submit(query_clinvar_batch, variants): "clinvar",
-                executor.submit(query_myvariant_batch, variants): "myvariant",
+                executor.submit(annotate_with_clinvar, variants): "clinvar",
+                executor.submit(annotate_with_myvariant, variants): "myvariant",
             }
             for future in as_completed(futures):
                 name = futures[future]
                 try:
                     result = future.result()
                     if name == "clinvar":
-                        clinvar_results = result
+                        clinvar_results = _to_rsid_dict(result, variants)
                     elif name == "myvariant":
-                        myvariant_results = result
+                        myvariant_results = _to_rsid_dict(result, variants)
                 except Exception as e:
                     logger.error(f"{name} annotation failed: {e}")
 
     elif mode == "full":
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
-                executor.submit(query_clinvar_batch, variants): "clinvar",
-                executor.submit(query_myvariant_batch, variants): "myvariant",
+                executor.submit(annotate_with_clinvar, variants): "clinvar",
+                executor.submit(annotate_with_myvariant, variants): "myvariant",
             }
             for future in as_completed(futures):
                 name = futures[future]
                 try:
                     result = future.result()
                     if name == "clinvar":
-                        clinvar_results = result
+                        clinvar_results = _to_rsid_dict(result, variants)
                     elif name == "myvariant":
-                        myvariant_results = result
+                        myvariant_results = _to_rsid_dict(result, variants)
                 except Exception as e:
                     logger.error(f"{name} annotation failed: {e}")
 
         # VEP and gnomAD sequentially (rate limits)
         try:
-            vep_results = query_vep_batch(variants)
+            vep_results = _to_rsid_dict(annotate_with_ensembl_vep(variants), variants)
         except Exception as e:
             logger.error(f"VEP annotation failed: {e}")
 
         try:
-            gnomad_results = query_gnomad_batch(variants)
+            gnomad_results = _to_rsid_dict(annotate_with_gnomad(variants), variants)
         except Exception as e:
             logger.error(f"gnomAD annotation failed: {e}")
 

@@ -66,7 +66,7 @@ jobs:
         run: pip install flake8 ruff
 
       - name: Run ruff
-        run: ruff check . --ignore E501,W503
+        run: ruff check . --ignore E501
 
       - name: Run flake8
         run: flake8 . --max-line-length=120 --exclude=.git,__pycache__,deploy,templates

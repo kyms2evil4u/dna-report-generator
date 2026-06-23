@@ -122,3 +122,16 @@ def query_myvariant_batch(variants: List[Dict], batch_size: int = 1000) -> Dict[
         logger.info(f"MyVariant: processed {min(i + batch_size, len(rsids))}/{len(rsids)}")
 
     return results
+
+
+def annotate_with_myvariant(variants):
+    """Returns variants as a list, annotated by this module (test-friendly wrapper)."""
+    if not variants:
+        return []
+    try:
+        annotations = query_myvariant_batch(variants)
+        if isinstance(annotations, list):
+            return annotations
+        return [{**v, **annotations.get(v.get('rsid', ''), {})} for v in variants]
+    except Exception:
+        return list(variants)

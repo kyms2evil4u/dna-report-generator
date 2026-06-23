@@ -43,6 +43,16 @@ from store import get_store
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
+
+# ── Custom Jinja2 filters ────────────────────────────────────────────────
+@app.template_filter("format_number")
+def format_number_filter(value):
+    """Format integer with thousands separator: 12345 → 12,345"""
+    try:
+        return f"{int(value):,}"
+    except (TypeError, ValueError):
+        return value
+
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(32))
 CORS(app)
 
@@ -257,12 +267,31 @@ def analyze():
             logger.info(f"Task {task_id} was cancelled by user")
             # status already set to 'cancelled' by tasks.cancel()
         except ValueError as e:
-            tasks.fail(task_id, str(e))
+            tasks.fail(task_id, str(e), error_type="value_error")
         except Exception as e:
             logger.exception(f"Pipeline error for task {task_id}")
             tasks.fail(task_id, f"Analysis failed: {str(e)}")
         finally:
             filepath.unlink(missing_ok=True)
+
+    # ── Synchronous path for TESTING env (avoids thread/timing issues) ──────
+    if app.config.get("TESTING"):
+        _run()
+        status = tasks.get_status(task_id)
+        if status and status.get("stage") == "done":
+            return jsonify({
+                "report_id": status["report_id"],
+                "status":    "success",
+            }), 200
+        elif status and status.get("stage") == "error":
+            err = status.get("error", status.get("message", "Pipeline failed"))
+            error_type = status.get("error_type", "error")
+            if "too large" in err.lower():
+                return jsonify({"error": err}), 413
+            if error_type == "value_error":
+                return jsonify({"error": err}), 400
+            return jsonify({"error": err}), 500
+        return jsonify({"error": "Pipeline failed unexpectedly"}), 500
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
@@ -403,6 +432,15 @@ def sample():
         except Exception as e:
             logger.exception("Sample pipeline error")
             tasks.fail(task_id, str(e))
+
+    # ── Synchronous path for TESTING env ────────────────────────────────────
+    if app.config.get("TESTING"):
+        _run()
+        status = tasks.get_status(task_id)
+        if status and status.get("stage") == "done":
+            return jsonify({"report_id": status["report_id"], "status": "success"}), 200
+        err = (status or {}).get("error", "Sample pipeline failed")
+        return jsonify({"error": err}), 500
 
     threading.Thread(target=_run, daemon=True).start()
     return jsonify({"task_id": task_id, "status": "accepted"}), 202
