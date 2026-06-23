@@ -1,10 +1,10 @@
-import pathlib
 """
 Standalone HTML Report Generator using Jinja2.
 Produces a self-contained, interactive HTML file with embedded CSS/JS.
 """
 
 import os
+import pathlib
 import json
 from typing import Dict
 from jinja2 import Environment, FileSystemLoader, select_autoescape

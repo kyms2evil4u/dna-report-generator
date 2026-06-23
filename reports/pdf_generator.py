@@ -1,9 +1,9 @@
-import pathlib
 """
 PDF Report Generator using ReportLab.
 Produces a professional, multi-section DNA report.
 """
 
+import pathlib
 from datetime import datetime
 from typing import Dict, Any
 
