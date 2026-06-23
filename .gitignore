@@ -56,3 +56,4 @@ flask_session/
 # Secrets
 .env
 config.local.py
+.coverage

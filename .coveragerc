@@ -1,0 +1,5 @@
+[run]
+omit =
+    tests/*
+    deploy/*
+    data/sample_generator.py
