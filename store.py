@@ -50,6 +50,9 @@ def _get_pg_conn():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
         return None
+    # Railway injects postgres:// but psycopg2 requires postgresql://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
     try:
         import psycopg2
         import psycopg2.extras

@@ -1,59 +1,51 @@
-# Deploy to Railway
+# Deploy to Railway — Launch Guide
 
-Railway auto-detects the Dockerfile and provisions managed Postgres + Redis for you.
-Total time: ~5 minutes.
+Railway auto-detects the `Dockerfile` and `railway.toml` at the repo root.
+Total time to live URL: **~5 minutes**.
 
 ---
 
-## Steps
+## One-Time Setup (do this once)
 
-### 1. Install Railway CLI
+### 1. Create the Railway project
+Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
+→ select `kyms2evil4u/dna-report-generator` → click **Deploy Now**.
+
+### 2. Add Postgres + Redis
+In your Railway project dashboard:
+- Click **+ New** → **Database** → **Add PostgreSQL**
+- Click **+ New** → **Database** → **Add Redis**
+
+Railway automatically injects `DATABASE_URL` and `REDIS_URL` into your service.
+
+### 3. Set environment variables
+In your service → **Variables** tab, add:
+
+| Variable | Value |
+|----------|-------|
+| `SECRET_KEY` | run `openssl rand -hex 32` and paste the result |
+| `FLASK_ENV` | `production` |
+| `REPORT_TTL_DAYS` | `7` |
+
+### 4. Get your Railway token (for CI auto-deploy)
+Go to **Project Settings** → **Tokens** → **New Token** → copy it.
+
+Add it to GitHub: repo → **Settings → Secrets → Actions → New secret**
+- Name: `RAILWAY_TOKEN`
+- Value: your token
+
+### 5. That's it — every push to `main` auto-deploys ✅
+
+---
+
+## Useful CLI commands
 ```bash
 npm install -g @railway/cli
 railway login
+railway logs          # tail live logs
+railway run python main.py formats   # run a one-off command
+railway open          # open your live URL
 ```
 
-### 2. Create project & link repo
-```bash
-railway init
-# Select "Empty Project", name it "dna-report-generator"
-
-railway link
-# Select your project
-```
-
-### 3. Add Postgres + Redis plugins
-In the Railway dashboard → your project → **+ New** → select **PostgreSQL**, then **+ New** → **Redis**.
-
-Or via CLI:
-```bash
-railway add --plugin postgresql
-railway add --plugin redis
-```
-
-### 4. Set environment variables
-```bash
-railway variables set SECRET_KEY=$(openssl rand -hex 32)
-railway variables set FLASK_ENV=production
-railway variables set REPORT_TTL_DAYS=7
-```
-
-Railway automatically injects `DATABASE_URL` and `REDIS_URL` from the plugins — no manual wiring needed.
-
-### 5. Deploy
-```bash
-railway up
-```
-
-### 6. Open your app
-```bash
-railway open
-```
-
----
-
-## Notes
-- Railway runs the `Dockerfile` automatically — no config changes needed.
-- The `railway.toml` in this folder sets the health check path and restart policy.
-- To view logs: `railway logs`
-- To run a one-off command (e.g. DB migration): `railway run python main.py formats`
+## Health check
+Your app exposes `GET /api/health` — Railway monitors this automatically.
