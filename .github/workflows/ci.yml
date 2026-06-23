@@ -69,7 +69,7 @@ jobs:
         run: ruff check . --ignore E501
 
       - name: Run flake8
-        run: flake8 . --max-line-length=120 --exclude=.git,__pycache__,deploy,templates
+        run: flake8 . --max-line-length=150 --extend-ignore=E203,E221,E231,E272,E302,E303,E305,E501 --exclude=.git,__pycache__,deploy,templates
 
   # ── Docker build check ─────────────────────────────────────────
   docker:

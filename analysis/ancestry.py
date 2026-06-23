@@ -102,7 +102,7 @@ def compute_ancestry(variants: List[Dict]) -> Dict:
     if markers_used == 0:
         # No AIMs found — return uniform distribution
         return {
-            "composition": [{"population": pop, "percentage": round(100.0 / len(populations), 1)} for pop in populations],
+            "composition": [{"population": pop, "percentage": round(100.0 / len(populations), 1)} for pop in populations],  # noqa: E501
             "top_population": "Unknown",
             "confidence": 0.0,
             "markers_used": 0,

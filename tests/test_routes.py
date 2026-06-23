@@ -143,7 +143,7 @@ class TestSampleRoute:
         mock_anc.return_value   = report["ancestry"]
         mock_risk.return_value  = []
         mock_pgx.return_value   = []
-        mock_traits.return_value= []
+        mock_traits.return_value = []
 
         res = client.get("/api/sample?name=Demo+User&mode=fast")
         assert res.status_code == 200

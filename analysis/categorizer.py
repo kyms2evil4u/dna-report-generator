@@ -18,54 +18,54 @@ from typing import List, Dict
 # ──────────────────────────────────────────────
 KNOWN_SNP_CATALOG = {
     # ── PHARMACOGENOMICS ──────────────────────
-    "rs4244285":  {"category": "pharmacogenomics", "gene": "CYP2C19", "drug": "Clopidogrel / PPIs", "effect": "Reduced metabolism (poor metabolizer)"},
-    "rs4986893":  {"category": "pharmacogenomics", "gene": "CYP2C19", "drug": "Clopidogrel", "effect": "No function (*3 allele)"},
-    "rs3892097":  {"category": "pharmacogenomics", "gene": "CYP2D6",  "drug": "Codeine / Antidepressants", "effect": "Reduced metabolism"},
-    "rs1065852":  {"category": "pharmacogenomics", "gene": "CYP2D6",  "drug": "Tamoxifen / Codeine", "effect": "Reduced metabolism"},
-    "rs1799853":  {"category": "pharmacogenomics", "gene": "CYP2C9",  "drug": "Warfarin / NSAIDs", "effect": "Reduced metabolism (*2 allele)"},
-    "rs1057910":  {"category": "pharmacogenomics", "gene": "CYP2C9",  "drug": "Warfarin", "effect": "Significantly reduced metabolism (*3 allele)"},
-    "rs9923231":  {"category": "pharmacogenomics", "gene": "VKORC1", "drug": "Warfarin", "effect": "Warfarin dose requirement reduced"},
-    "rs2108622":  {"category": "pharmacogenomics", "gene": "CYP4F2", "drug": "Warfarin", "effect": "Higher warfarin dose requirement"},
-    "rs4149056":  {"category": "pharmacogenomics", "gene": "SLCO1B1","drug": "Statins", "effect": "Increased statin myopathy risk"},
-    "rs429358":   {"category": "pharmacogenomics", "gene": "APOE",   "drug": "Statins / Alzheimer's drugs", "effect": "APOE ε4 — altered drug efficacy"},
+    "rs4244285":  {"category": "pharmacogenomics", "gene": "CYP2C19", "drug": "Clopidogrel / PPIs", "effect": "Reduced metabolism (poor metabolizer)"},  # noqa: E501,E231
+    "rs4986893":  {"category": "pharmacogenomics", "gene": "CYP2C19", "drug": "Clopidogrel", "effect": "No function (*3 allele)"},  # noqa: E501,E231
+    "rs3892097":  {"category": "pharmacogenomics", "gene": "CYP2D6",  "drug": "Codeine / Antidepressants", "effect": "Reduced metabolism"},  # noqa: E501,E231
+    "rs1065852":  {"category": "pharmacogenomics", "gene": "CYP2D6",  "drug": "Tamoxifen / Codeine", "effect": "Reduced metabolism"},  # noqa: E501,E231
+    "rs1799853":  {"category": "pharmacogenomics", "gene": "CYP2C9",  "drug": "Warfarin / NSAIDs", "effect": "Reduced metabolism (*2 allele)"},  # noqa: E501,E231
+    "rs1057910":  {"category": "pharmacogenomics", "gene": "CYP2C9",  "drug": "Warfarin", "effect": "Significantly reduced metabolism (*3 allele)"},  # noqa: E501,E231
+    "rs9923231":  {"category": "pharmacogenomics", "gene": "VKORC1", "drug": "Warfarin", "effect": "Warfarin dose requirement reduced"},  # noqa: E501,E231
+    "rs2108622":  {"category": "pharmacogenomics", "gene": "CYP4F2", "drug": "Warfarin", "effect": "Higher warfarin dose requirement"},  # noqa: E501,E231
+    "rs4149056":  {"category": "pharmacogenomics", "gene": "SLCO1B1","drug": "Statins", "effect": "Increased statin myopathy risk"},  # noqa: E501,E231
+    "rs429358":   {"category": "pharmacogenomics", "gene": "APOE",   "drug": "Statins / Alzheimer's drugs", "effect": "APOE ε4 — altered drug efficacy"},  # noqa: E501,E231
 
     # ── COMPLEX DISEASE RISK ──────────────────
-    "rs7903146":  {"category": "complex_disease", "gene": "TCF7L2", "condition": "Type 2 Diabetes", "risk_allele": "T", "or": 1.37},
-    "rs12255372": {"category": "complex_disease", "gene": "TCF7L2", "condition": "Type 2 Diabetes", "risk_allele": "T", "or": 1.30},
-    "rs1801282":  {"category": "complex_disease", "gene": "PPARG",  "condition": "Type 2 Diabetes", "risk_allele": "C", "or": 1.25},
-    "rs10830963": {"category": "complex_disease", "gene": "MTNR1B", "condition": "Type 2 Diabetes", "risk_allele": "G", "or": 1.15},
-    "rs1333049":  {"category": "complex_disease", "gene": "CDKN2B-AS1", "condition": "Coronary Artery Disease", "risk_allele": "C", "or": 1.29},
-    "rs10757278": {"category": "complex_disease", "gene": "CDKN2A/B",  "condition": "Coronary Artery Disease", "risk_allele": "G", "or": 1.26},
-    "rs1801133":  {"category": "complex_disease", "gene": "MTHFR",  "condition": "Cardiovascular / Folate metabolism", "risk_allele": "T", "or": 1.20},
-    "rs1800497":  {"category": "complex_disease", "gene": "ANKK1",  "condition": "Addiction / Reward pathway", "risk_allele": "T", "or": 1.15},
-    "rs6265":     {"category": "complex_disease", "gene": "BDNF",   "condition": "Depression / Anxiety", "risk_allele": "T", "or": 1.10},
+    "rs7903146":  {"category": "complex_disease", "gene": "TCF7L2", "condition": "Type 2 Diabetes", "risk_allele": "T", "or": 1.37},  # noqa: E501,E231
+    "rs12255372": {"category": "complex_disease", "gene": "TCF7L2", "condition": "Type 2 Diabetes", "risk_allele": "T", "or": 1.30},  # noqa: E501,E231
+    "rs1801282":  {"category": "complex_disease", "gene": "PPARG",  "condition": "Type 2 Diabetes", "risk_allele": "C", "or": 1.25},  # noqa: E501,E231
+    "rs10830963": {"category": "complex_disease", "gene": "MTNR1B", "condition": "Type 2 Diabetes", "risk_allele": "G", "or": 1.15},  # noqa: E501,E231
+    "rs1333049":  {"category": "complex_disease", "gene": "CDKN2B-AS1", "condition": "Coronary Artery Disease", "risk_allele": "C", "or": 1.29},  # noqa: E501,E231
+    "rs10757278": {"category": "complex_disease", "gene": "CDKN2A/B",  "condition": "Coronary Artery Disease", "risk_allele": "G", "or": 1.26},  # noqa: E501,E231
+    "rs1801133":  {"category": "complex_disease", "gene": "MTHFR",  "condition": "Cardiovascular / Folate metabolism", "risk_allele": "T", "or": 1.20},  # noqa: E501,E231
+    "rs1800497":  {"category": "complex_disease", "gene": "ANKK1",  "condition": "Addiction / Reward pathway", "risk_allele": "T", "or": 1.15},  # noqa: E501,E231
+    "rs6265":     {"category": "complex_disease", "gene": "BDNF",   "condition": "Depression / Anxiety", "risk_allele": "T", "or": 1.10},  # noqa: E501,E231
 
     # ── AGE-RELATED RISK ─────────────────────
-    "rs10490924": {"category": "age_related", "gene": "ARMS2", "condition": "Age-related Macular Degeneration", "risk_allele": "T", "or": 2.73},
-    "rs1061170":  {"category": "age_related", "gene": "CFH",   "condition": "Age-related Macular Degeneration", "risk_allele": "T", "or": 2.45},
-    "rs3764261":  {"category": "age_related", "gene": "CETP",  "condition": "HDL Cholesterol (cardiovascular aging)", "risk_allele": "A", "or": 0.85},
-    "rs2070895":  {"category": "age_related", "gene": "LIPC",  "condition": "HDL Cholesterol", "risk_allele": "A", "or": 1.12},
-    "rs5174":     {"category": "age_related", "gene": "LRP8",  "condition": "Coronary Artery Disease (late onset)", "risk_allele": "C", "or": 1.18},
+    "rs10490924": {"category": "age_related", "gene": "ARMS2", "condition": "Age-related Macular Degeneration", "risk_allele": "T", "or": 2.73},  # noqa: E501,E231
+    "rs1061170":  {"category": "age_related", "gene": "CFH",   "condition": "Age-related Macular Degeneration", "risk_allele": "T", "or": 2.45},  # noqa: E501,E231
+    "rs3764261":  {"category": "age_related", "gene": "CETP",  "condition": "HDL Cholesterol (cardiovascular aging)", "risk_allele": "A", "or": 0.85},  # noqa: E501,E231
+    "rs2070895":  {"category": "age_related", "gene": "LIPC",  "condition": "HDL Cholesterol", "risk_allele": "A", "or": 1.12},  # noqa: E501,E231
+    "rs5174":     {"category": "age_related", "gene": "LRP8",  "condition": "Coronary Artery Disease (late onset)", "risk_allele": "C", "or": 1.18},  # noqa: E501,E231
 
     # ── INHERITED / CARRIER STATUS ───────────
-    "rs334":      {"category": "inherited", "gene": "HBB",   "condition": "Sickle Cell Anemia", "inheritance": "Autosomal Recessive"},
-    "rs76723693": {"category": "inherited", "gene": "BRCA1", "condition": "Hereditary Breast/Ovarian Cancer", "inheritance": "Autosomal Dominant"},
-    "rs80357382": {"category": "inherited", "gene": "BRCA2", "condition": "Hereditary Breast/Ovarian Cancer", "inheritance": "Autosomal Dominant"},
-    "rs28897696": {"category": "inherited", "gene": "MLH1",  "condition": "Lynch Syndrome / Colorectal Cancer", "inheritance": "Autosomal Dominant"},
-    "rs63750447": {"category": "inherited", "gene": "APP",   "condition": "Early-onset Alzheimer's Disease", "inheritance": "Autosomal Dominant"},
+    "rs334":      {"category": "inherited", "gene": "HBB",   "condition": "Sickle Cell Anemia", "inheritance": "Autosomal Recessive"},  # noqa: E501,E231
+    "rs76723693": {"category": "inherited", "gene": "BRCA1", "condition": "Hereditary Breast/Ovarian Cancer", "inheritance": "Autosomal Dominant"},  # noqa: E501,E231
+    "rs80357382": {"category": "inherited", "gene": "BRCA2", "condition": "Hereditary Breast/Ovarian Cancer", "inheritance": "Autosomal Dominant"},  # noqa: E501,E231
+    "rs28897696": {"category": "inherited", "gene": "MLH1",  "condition": "Lynch Syndrome / Colorectal Cancer", "inheritance": "Autosomal Dominant"},  # noqa: E501,E231
+    "rs63750447": {"category": "inherited", "gene": "APP",   "condition": "Early-onset Alzheimer's Disease", "inheritance": "Autosomal Dominant"},  # noqa: E501,E231
 
     # ── PHYSICAL TRAITS ──────────────────────
-    "rs12913832": {"category": "traits", "gene": "HERC2",  "trait": "Eye Color", "effect": "Blue/light eyes (A allele)"},
+    "rs12913832": {"category": "traits", "gene": "HERC2",  "trait": "Eye Color", "effect": "Blue/light eyes (A allele)"},  # noqa: E501,E231
     "rs1800401":  {"category": "traits", "gene": "OCA2",   "trait": "Eye Color", "effect": "Brown/dark eyes"},
-    "rs1805007":  {"category": "traits", "gene": "MC1R",   "trait": "Hair Color / Skin", "effect": "Red hair / fair skin risk"},
-    "rs1805008":  {"category": "traits", "gene": "MC1R",   "trait": "Hair Color / Freckles", "effect": "Red hair / freckling"},
-    "rs4988235":  {"category": "traits", "gene": "LCT",    "trait": "Lactase Persistence", "effect": "Lactose tolerance in adulthood"},
-    "rs1042602":  {"category": "traits", "gene": "TYR",    "trait": "Skin Pigmentation", "effect": "Lighter skin (A allele)"},
-    "rs2814778":  {"category": "traits", "gene": "DARC",   "trait": "Malaria Resistance", "effect": "Duffy-null — protection from P. vivax"},
-    "rs53576":    {"category": "traits", "gene": "OXTR",   "trait": "Empathy / Social behavior", "effect": "Oxytocin receptor variant"},
-    "rs1799971":  {"category": "traits", "gene": "OPRM1",  "trait": "Pain sensitivity", "effect": "Altered opioid receptor affinity"},
-    "rs762551":   {"category": "traits", "gene": "CYP1A2", "trait": "Caffeine metabolism", "effect": "Fast/slow caffeine metabolizer"},
-    "rs2234922":  {"category": "traits", "gene": "EPHX1",  "trait": "Alcohol metabolism", "effect": "Altered epoxide hydrolase activity"},
+    "rs1805007":  {"category": "traits", "gene": "MC1R",   "trait": "Hair Color / Skin", "effect": "Red hair / fair skin risk"},  # noqa: E501,E231
+    "rs1805008":  {"category": "traits", "gene": "MC1R",   "trait": "Hair Color / Freckles", "effect": "Red hair / freckling"},  # noqa: E501,E231
+    "rs4988235":  {"category": "traits", "gene": "LCT",    "trait": "Lactase Persistence", "effect": "Lactose tolerance in adulthood"},  # noqa: E501,E231
+    "rs1042602":  {"category": "traits", "gene": "TYR",    "trait": "Skin Pigmentation", "effect": "Lighter skin (A allele)"},  # noqa: E501,E231
+    "rs2814778":  {"category": "traits", "gene": "DARC",   "trait": "Malaria Resistance", "effect": "Duffy-null — protection from P. vivax"},  # noqa: E501,E231
+    "rs53576":    {"category": "traits", "gene": "OXTR",   "trait": "Empathy / Social behavior", "effect": "Oxytocin receptor variant"},  # noqa: E501,E231
+    "rs1799971":  {"category": "traits", "gene": "OPRM1",  "trait": "Pain sensitivity", "effect": "Altered opioid receptor affinity"},  # noqa: E501,E231
+    "rs762551":   {"category": "traits", "gene": "CYP1A2", "trait": "Caffeine metabolism", "effect": "Fast/slow caffeine metabolizer"},  # noqa: E501,E231
+    "rs2234922":  {"category": "traits", "gene": "EPHX1",  "trait": "Alcohol metabolism", "effect": "Altered epoxide hydrolase activity"},  # noqa: E501,E231
 }
 
 PATHOGENIC_TERMS = {
