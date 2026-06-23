@@ -253,6 +253,9 @@ def analyze():
             REPORT_STORE[report_id] = report_data
             tasks.complete(task_id, report_id)
             logger.info(f"Report {report_id} ready for task {task_id} ({size_mb:.1f} MB)")
+        except tasks.CancelledError:
+            logger.info(f"Task {task_id} was cancelled by user")
+            # status already set to 'cancelled' by tasks.cancel()
         except ValueError as e:
             tasks.fail(task_id, str(e))
         except Exception as e:
@@ -307,7 +310,7 @@ def task_status_stream(task_id: str):
                 last_stage = status["stage"]
                 yield f"data: {json.dumps(status)}\n\n"
 
-            if status["stage"] in ("done", "error"):
+            if status["stage"] in ("done", "error", "cancelled"):
                 return
 
             time.sleep(0.5)
@@ -323,6 +326,32 @@ def task_status_stream(task_id: str):
             "X-Accel-Buffering": "no",   # tell Nginx not to buffer SSE
         },
     )
+
+@app.route("/api/cancel/<task_id>", methods=["POST"])
+def cancel_task(task_id: str):
+    """
+    Cancel a running analysis task.
+    Sets a flag that the pipeline thread checks between stages;
+    the thread cleans up its temp file and exits gracefully.
+    Also aborts any pending upload by marking the task cancelled
+    so the SSE stream closes and the frontend can react.
+    """
+    status = tasks.get_status(task_id)
+    if not status:
+        return jsonify({"error": "Task not found"}), 404
+
+    stage = status.get("stage", "")
+    if stage in ("done", "error", "cancelled"):
+        return jsonify({
+            "cancelled": False,
+            "reason": f"Task already in terminal state: {stage}",
+        }), 409
+
+    ok = tasks.cancel(task_id)
+    if ok:
+        logger.info(f"Task {task_id} cancelled (was at stage: {stage})")
+        return jsonify({"cancelled": True, "task_id": task_id})
+    return jsonify({"cancelled": False, "reason": "Could not cancel task"}), 500
 
 
 @app.route("/api/sample")
@@ -369,6 +398,8 @@ def sample():
             report_id = report_data["report_id"]
             REPORT_STORE[report_id] = report_data
             tasks.complete(task_id, report_id)
+        except tasks.CancelledError:
+            logger.info(f"Sample task {task_id} was cancelled")
         except Exception as e:
             logger.exception("Sample pipeline error")
             tasks.fail(task_id, str(e))

@@ -222,3 +222,73 @@ class TestHealthIncludesUploadLimit:
             import json
             body = json.loads(resp[0].get_data())
             assert "error" in body
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# tasks.py cancel logic
+# ─────────────────────────────────────────────────────────────────────────────
+class TestCancelTask:
+    def test_cancel_mid_pipeline(self):
+        import tasks
+        tid = tasks.create_task("big.vcf", 400.0)
+        tasks.advance(tid, "annotating")
+        ok = tasks.cancel(tid)
+        assert ok is True
+        s = tasks.get_status(tid)
+        assert s["stage"] == "cancelled"
+
+    def test_advance_raises_after_cancel(self):
+        import tasks
+        tid = tasks.create_task("big.vcf")
+        tasks.advance(tid, "parsing")
+        tasks.cancel(tid)
+        with pytest.raises(tasks.CancelledError):
+            tasks.advance(tid, "normalizing")
+
+    def test_cancel_done_task_returns_false(self):
+        import tasks
+        tid = tasks.create_task("done.vcf")
+        tasks.complete(tid, "report-abc")
+        ok = tasks.cancel(tid)
+        assert ok is False
+
+    def test_cancel_error_task_returns_false(self):
+        import tasks
+        tid = tasks.create_task("bad.vcf")
+        tasks.fail(tid, "something broke")
+        ok = tasks.cancel(tid)
+        assert ok is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /api/cancel endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+class TestCancelEndpoint:
+    @patch("app.tasks.get_status")
+    @patch("app.tasks.cancel")
+    def test_cancel_running_task(self, mock_cancel, mock_status, client):
+        mock_status.return_value = {"stage": "annotating", "task_id": "t1"}
+        mock_cancel.return_value = True
+        res = client.post("/api/cancel/t1")
+        import json
+        body = json.loads(res.data)
+        assert res.status_code == 200
+        assert body["cancelled"] is True
+
+    @patch("app.tasks.get_status")
+    def test_cancel_unknown_task_returns_404(self, mock_status, client):
+        mock_status.return_value = None
+        res = client.post("/api/cancel/nonexistent")
+        assert res.status_code == 404
+
+    @patch("app.tasks.get_status")
+    def test_cancel_done_task_returns_409(self, mock_status, client):
+        mock_status.return_value = {"stage": "done", "task_id": "t2"}
+        res = client.post("/api/cancel/t2")
+        assert res.status_code == 409
+
+    @patch("app.tasks.get_status")
+    def test_cancel_already_cancelled_returns_409(self, mock_status, client):
+        mock_status.return_value = {"stage": "cancelled", "task_id": "t3"}
+        res = client.post("/api/cancel/t3")
+        assert res.status_code == 409

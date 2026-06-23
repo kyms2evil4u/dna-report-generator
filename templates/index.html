@@ -96,6 +96,12 @@
                   border-radius: 10px; padding: 14px 24px; font-size: 13px; font-weight: 600;
                   cursor: pointer; transition: all 0.15s; }
     .btn-sample:hover { border-color: var(--primary); background: #F0F7FF; }
+    .btn-cancel {
+      background: transparent; color: var(--pathogenic); border: 1.5px solid var(--pathogenic);
+      padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; display: none;
+    }
+    .btn-cancel:hover { background: #FFF0F0; }
 
     /* Progress */
     #progressWrap { display:none; margin-top: 28px; }
@@ -228,8 +234,11 @@
       <button class="btn-analyze" id="analyzeBtn" onclick="startAnalysis()" disabled>
         🔬 Analyze DNA
       </button>
-      <button class="btn-sample" onclick="loadSample()">
+      <button class="btn-sample" id="sampleBtn" onclick="loadSample()">
         🧪 Try with Sample Data
+      </button>
+      <button class="btn-cancel" id="cancelBtn" onclick="cancelAnalysis()">
+        ✕ Cancel
       </button>
     </div>
 
@@ -257,6 +266,10 @@
         </div>
       </div>
       <div class="progress-label" id="progressLabel"></div>
+      <div id="cancelledMsg" style="display:none; margin-top:10px; color:var(--pathogenic);
+           font-size:13px; font-weight:600;">
+        ✕ Analysis cancelled.
+      </div>
     </div>
   <!-- How it works -->
   <div class="how-section">
@@ -343,8 +356,10 @@
   const fileInfo   = document.getElementById("fileInfo");
   const alertBox   = document.getElementById("alertBox");
 
-  let selectedFile = null;
-  let activeSource = null;   // EventSource for SSE
+  let selectedFile  = null;
+  let activeSource  = null;   // EventSource for SSE
+  let activeXHR     = null;   // current upload XHR (for abort)
+  let activeTaskId  = null;   // task_id of the running job
 
   // ── Drag and drop ─────────────────────────────────────────────────────────
   dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
@@ -409,9 +424,13 @@
 
   function resetProgress() {
     document.getElementById("stageAnalysis").style.display = "none";
+    document.getElementById("cancelledMsg").style.display  = "none";
     setUploadProgress(0, "");
     setAnalysisProgress(0, "Preparing…");
+    hideCancelBtn();
     hideProgressWrap();
+    activeTaskId = null;
+    activeXHR    = null;
   }
 
   // ── Poll task status via SSE ──────────────────────────────────────────────
@@ -445,9 +464,13 @@
         es.close();
         activeSource = null;
         setTimeout(() => { window.location.href = `/report/${data.report_id}`; }, 500);
+      } else if (data.stage === "cancelled") {
+        es.close();
+        activeSource = null;
+        handleCancelled();
       } else if (data.stage === "error") {
         showAlert("Analysis failed: " + (data.error || "Unknown error"));
-        analyzeBtn.disabled = false;
+        analyzeBtn.disabled    = false;
         analyzeBtn.textContent = "🔬 Analyze DNA";
         resetProgress();
         es.close();
@@ -483,6 +506,8 @@
         if (data.stage === "done" && data.report_id) {
           setAnalysisProgress(100, "Complete! Loading report…");
           setTimeout(() => { window.location.href = `/report/${data.report_id}`; }, 500);
+        } else if (data.stage === "cancelled") {
+          handleCancelled();
         } else if (data.stage === "error") {
           showAlert("Analysis failed: " + (data.error || "Unknown error"));
           analyzeBtn.disabled    = false;
@@ -508,6 +533,7 @@
     hideAlert();
     showProgressWrap();
     setUploadProgress(0, "Starting upload…");
+    showCancelBtn();
 
     const formData = new FormData();
     formData.append("file", selectedFile);
@@ -541,6 +567,8 @@
           analyzeBtn.disabled = false; analyzeBtn.textContent = "🔬 Analyze DNA";
           resetProgress(); return;
         }
+        activeTaskId = resp.task_id;
+        activeXHR    = null;   // upload done, XHR no longer needed
         trackTaskSSE(resp.task_id);
       } else if (xhr.status === 413) {
         let msg = "File too large.";
@@ -564,6 +592,7 @@
     });
 
     xhr.open("POST", "/api/analyze");
+    activeXHR = xhr;
     xhr.send(formData);
   }
 
@@ -590,6 +619,50 @@
       showAlert("Sample error: " + err.message);
       resetProgress();
     }
+  }
+
+  // ── Cancel ────────────────────────────────────────────────────────────────
+  function showCancelBtn() {
+    document.getElementById("cancelBtn").style.display  = "inline-block";
+    document.getElementById("sampleBtn").style.display  = "none";
+  }
+  function hideCancelBtn() {
+    document.getElementById("cancelBtn").style.display  = "none";
+    document.getElementById("sampleBtn").style.display  = "inline-block";
+  }
+
+  function handleCancelled() {
+    // Close any open SSE/XHR
+    if (activeSource) { activeSource.close(); activeSource = null; }
+    // Show cancelled message, restore buttons
+    document.getElementById("stageAnalysis").style.display = "none";
+    document.getElementById("cancelledMsg").style.display  = "block";
+    hideCancelBtn();
+    analyzeBtn.disabled    = false;
+    analyzeBtn.textContent = "🔬 Analyze DNA";
+    activeTaskId = null;
+  }
+
+  async function cancelAnalysis() {
+    const taskId = activeTaskId;
+
+    // 1. Abort the XHR upload immediately if still in progress
+    if (activeXHR) {
+      activeXHR.abort();
+      activeXHR = null;
+    }
+
+    // 2. Close the SSE stream
+    if (activeSource) { activeSource.close(); activeSource = null; }
+
+    // 3. Tell the server to cancel the pipeline thread
+    if (taskId) {
+      try {
+        await fetch(`/api/cancel/${taskId}`, { method: "POST" });
+      } catch { /* best-effort */ }
+    }
+
+    handleCancelled();
   }
 </script>
 </body>

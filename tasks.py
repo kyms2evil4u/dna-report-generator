@@ -15,9 +15,17 @@ Stages (in order):
   categorizing →  80%  Risk scoring + ancestry + PGx
   building     →  90%  Assembling report JSON
   done         → 100%  Report ready — report_id available
+  cancelled    →   –   User cancelled the job
   error        →   –   Failed with message
 
 Storage: Redis with 2-hour TTL (falls back to in-memory dict).
+
+Cancellation:
+  - cancel(task_id) sets a flag in an in-process dict (_CANCEL_FLAGS).
+  - The pipeline thread calls is_cancelled(task_id) between stages;
+    if True it raises CancelledError and cleans up.
+  - The flag store is in-process only (not Redis) — it only needs to
+    live as long as the thread is running, so that's fine.
 """
 
 import os
@@ -25,6 +33,7 @@ import json
 import time
 import uuid
 import logging
+import threading
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -41,10 +50,58 @@ STAGES = {
     "categorizing": ("Scoring risks & ancestry…",           80),
     "building":     ("Building report…",                    90),
     "done":         ("Complete! Loading report…",          100),
+    "cancelled":    ("Cancelled",                            0),
     "error":        ("Analysis failed",                      0),
 }
 
-TASK_TTL = 7200   # 2 hours
+TASK_TTL = 7200   # 2 hours in Redis
+
+
+# ── Cancel flag registry (in-process, thread-safe) ────────────────────────────
+_CANCEL_FLAGS: dict[str, bool] = {}
+_CANCEL_LOCK  = threading.Lock()
+
+
+class CancelledError(Exception):
+    """Raised inside the pipeline thread when the user cancels."""
+    pass
+
+
+def cancel(task_id: str) -> bool:
+    """
+    Signal a running task to stop.
+    Returns True if the flag was set (task existed), False otherwise.
+    """
+    data = _load(task_id)
+    if not data:
+        return False
+    stage = data.get("stage", "")
+    # Can't cancel already-terminal tasks
+    if stage in ("done", "cancelled", "error"):
+        return False
+    with _CANCEL_LOCK:
+        _CANCEL_FLAGS[task_id] = True
+    # Immediately update stored status so the SSE stream sees it
+    data.update({
+        "stage":      "cancelled",
+        "label":      STAGES["cancelled"][0],
+        "pct":        STAGES["cancelled"][1],
+        "error":      None,
+        "updated_at": time.time(),
+    })
+    _save(task_id, data)
+    return True
+
+
+def is_cancelled(task_id: str) -> bool:
+    """Check whether a cancel has been requested for this task."""
+    with _CANCEL_LOCK:
+        return _CANCEL_FLAGS.get(task_id, False)
+
+
+def _clear_cancel_flag(task_id: str) -> None:
+    with _CANCEL_LOCK:
+        _CANCEL_FLAGS.pop(task_id, None)
 
 
 # ── Storage backend ───────────────────────────────────────────────────────────
@@ -111,7 +168,15 @@ def create_task(filename: str = "", file_size_mb: float = 0.0) -> str:
 
 
 def advance(task_id: str, stage: str, **extra) -> None:
-    """Move a task to the given stage, optionally setting extra fields."""
+    """
+    Move a task to the given stage.
+    Raises CancelledError if a cancel has been requested — call this
+    between every major pipeline step so cancellation is responsive.
+    """
+    # Check cancel flag before advancing
+    if is_cancelled(task_id):
+        raise CancelledError(f"Task {task_id} was cancelled")
+
     data = _load(task_id)
     if not data:
         return
@@ -128,6 +193,7 @@ def advance(task_id: str, stage: str, **extra) -> None:
 
 def fail(task_id: str, message: str) -> None:
     """Mark a task as failed with an error message."""
+    _clear_cancel_flag(task_id)
     data = _load(task_id)
     if not data:
         return
@@ -143,6 +209,7 @@ def fail(task_id: str, message: str) -> None:
 
 def complete(task_id: str, report_id: str) -> None:
     """Mark a task as done and attach the final report_id."""
+    _clear_cancel_flag(task_id)
     advance(task_id, "done", report_id=report_id)
 
 
