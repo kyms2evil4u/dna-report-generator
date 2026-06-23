@@ -5,7 +5,7 @@ Routes: landing page, file upload/analysis, report viewer, exports
 Large-file support:
   - Flask MAX_CONTENT_LENGTH: 2 GB
   - Uploads streamed to disk in 1 MB chunks (never fully buffered in RAM)
-  - Size limit configurable via MAX_FILE_SIZE_MB env var (default: 700 MB)
+  - Size limit configurable via MAX_FILE_SIZE_MB env var (default: 2000 MB)
   - Parsers use line-by-line iteration (constant memory regardless of file size)
 
 Progress tracking:
@@ -60,7 +60,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 # ── File size configuration ────────────────────────────────────────────────────
-MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", 700))
+MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", 2000))
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024   # 2 GB hard ceiling
 STREAM_CHUNK_SIZE = 1 * 1024 * 1024                          # 1 MB streaming chunks
 
@@ -241,7 +241,7 @@ def analyze():
             tasks.fail(task_id, (
                 f"File too large ({size_mb:.1f} MB). "
                 f"Maximum allowed is {MAX_FILE_SIZE_MB} MB. "
-                "For whole-genome VCFs over 700 MB, please pre-filter to SNP-only variants."
+                "Tip: if uploading a whole-genome VCF, compress it with bgzip first to reduce size by ~70%."
             ))
             return jsonify({
                 "error": (
@@ -337,15 +337,18 @@ def task_status_stream(task_id: str):
     """
     def _generate():
         last_stage = None
-        for _ in range(720):   # max 6 min (720 × 0.5s)
+        ping_counter = 0
+        for _ in range(2400):   # max 20 min (2400 × 0.5s) — covers 500 MB on slow connections
             status = tasks.get_status(task_id)
             if not status:
                 yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
                 return
 
-            # Only push when something changed
-            if status["stage"] != last_stage:
+            # Push on stage change OR every 30s as a keepalive (prevents proxy idle-timeout)
+            ping_counter += 1
+            if status["stage"] != last_stage or ping_counter >= 60:
                 last_stage = status["stage"]
+                ping_counter = 0
                 yield f"data: {json.dumps(status)}\n\n"
 
             if status["stage"] in ("done", "error", "cancelled"):
@@ -354,7 +357,7 @@ def task_status_stream(task_id: str):
             time.sleep(0.5)
 
         # Timeout safety valve
-        yield f"data: {json.dumps({'stage': 'error', 'label': 'Timeout', 'pct': 0})}\n\n"
+        yield f"data: {json.dumps({'stage': 'error', 'label': 'Timeout — processing took too long', 'pct': 0})}\n\n"
 
     return Response(
         stream_with_context(_generate()),
