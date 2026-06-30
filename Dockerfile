@@ -46,8 +46,7 @@ USER dna
 # Flask config
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    FLASK_ENV=production \
-    PORT=5000
+    FLASK_ENV=production
 
 EXPOSE 5000 8080
 
