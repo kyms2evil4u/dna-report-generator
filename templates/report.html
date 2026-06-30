@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DNA Report — {{ report.name | default('Your') }}</title>
+  <script>
+    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/speed-insights/script.js"></script>
   <style>
     /* ─── Reset & Base ─────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -313,7 +317,7 @@
     <button class="tab" data-panel="raw">📋 All Variants</button>
   </div>
 
-  <!-- ── ANCESTRY PANEL ─────────────────────────────────────────────── -->
+  <!-- ── ANCESTRY PANEL ───────────���─────────────────────────────────── -->
   <div id="panel-ancestry" class="panel active">
     <div class="card">
       <h2>Ancestry Composition</h2>
