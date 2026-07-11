@@ -471,11 +471,14 @@ def view_report(report_id: str):
 def download_pdf(report_id: str):
     if not _validate_report_id(report_id):
         abort(400)
+    safe_report_id = secure_filename(report_id)
+    if not safe_report_id or safe_report_id != report_id:
+        abort(400)
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
     reports_root = REPORTS_FOLDER.resolve()
-    pdf_path = (REPORTS_FOLDER / f"{report_id}.pdf").resolve()
+    pdf_path = (REPORTS_FOLDER / f"{safe_report_id}.pdf").resolve()
     try:
         pdf_path.relative_to(reports_root)
     except ValueError:
@@ -494,11 +497,14 @@ def download_pdf(report_id: str):
 def download_html(report_id: str):
     if not _validate_report_id(report_id):
         abort(400)
+    safe_report_id = secure_filename(report_id)
+    if not safe_report_id or safe_report_id != report_id:
+        abort(400)
     report_data = REPORT_STORE.get(report_id)
     if not report_data:
         abort(404)
     reports_root = REPORTS_FOLDER.resolve()
-    html_path = (REPORTS_FOLDER / f"{report_id}.html").resolve()
+    html_path = (REPORTS_FOLDER / f"{safe_report_id}.html").resolve()
     try:
         html_path.relative_to(reports_root)
     except ValueError:
