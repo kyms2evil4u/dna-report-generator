@@ -1,0 +1,12 @@
+{
+  "name": "dna-report-generator",
+  "version": "1.0.0",
+  "description": "DNA Report Generator - Flask Application with Vercel Speed Insights",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build step required - using CDN for Speed Insights'"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^1.0.12"
+  }
+}

@@ -172,7 +172,7 @@
     .badge-blue    { background: #DBEAFE; color: #1D4ED8; }
     .badge-gray    { background: #F3F4F6; color: #4B5563; }
 
-    /* ─── Progress Bars ─────────────────────────────────────────────────────── */
+    /* ─── Progress Bars ───────────────────────────────────────────��─────────── */
     .risk-bar-wrap { margin-bottom: 16px; }
     .risk-bar-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
     .risk-bar-label { font-weight: 600; font-size: 13px; }
@@ -313,7 +313,7 @@
     <button class="tab" data-panel="raw">📋 All Variants</button>
   </div>
 
-  <!-- ── ANCESTRY PANEL ─────────────────────────────────────────────── -->
+  <!-- ── ANCESTRY PANEL ─────────���───────────────────────────────────── -->
   <div id="panel-ancestry" class="panel active">
     <div class="card">
       <h2>Ancestry Composition</h2>
@@ -617,5 +617,8 @@
     a.click();
   }
 </script>
+
+<!-- Vercel Speed Insights -->
+<script type="module" src="{{ url_for('static', filename='js/speed-insights.js') }}"></script>
 </body>
 </html>
